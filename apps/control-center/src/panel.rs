@@ -64,6 +64,14 @@ pub struct Panel {
     page: Cell<usize>,
     only: Option<String>,
     remember: bool,
+    config: RefCell<Config>,
+    ctx: RefCell<Option<Ctx>>,
+    editing: Cell<bool>,
+    /// The header's normal and edit-mode buttons.
+    head: RefCell<Option<(gtk::Box, gtk::Box)>>,
+    /// Widgets to add, shown in edit mode.
+    tray: gtk::Box,
+    me: RefCell<std::rc::Weak<Panel>>,
     panel1: RefCell<Option<nyx_desktop::panel::Panel>>,
 }
 
@@ -89,6 +97,10 @@ impl Panel {
         if let Some(p) = self.panel1.borrow().as_ref() {
             p.announce();
         }
+        // For screenshots: edit mode, or a detail view, straight away.
+        if std::env::var_os("NYX_CC_TEST_EDIT").is_some() {
+            self.set_editing(true);
+        }
         // For screenshots: open a detail view straight away.
         if let Some(which) = std::env::var("NYX_CC_TEST_DETAIL").ok().and_then(|d| match d.as_str() {
             "wifi" => Some(Detail::Wifi),
@@ -101,6 +113,9 @@ impl Panel {
     }
 
     pub fn hide(&self) {
+        if self.editing.get() {
+            self.set_editing(false);
+        }
         self.window.set_visible(false);
         self.catcher.set_visible(false);
         // Leave detail views behind; the next open starts on the dashboard.
@@ -153,6 +168,171 @@ impl Panel {
             c = w.next_sibling();
         }
         n
+    }
+
+    /// Draw the pages again from the layout (after an edit).
+    fn rebuild(&self) {
+        let Some(ctx) = self.ctx.borrow().clone() else { return };
+        while let Some(c) = self.pages.first_child() {
+            self.pages.remove(&c);
+        }
+        while let Some(c) = self.dots.first_child() {
+            self.dots.remove(&c);
+        }
+        let editing = self.editing.get();
+        let pages = self.config.borrow().pages.clone();
+        for (i, page) in pages.iter().enumerate() {
+            self.pages.add_named(&page_grid(&ctx, page, i, editing, self.me.borrow().clone()), Some(&format!("page-{i}")));
+            let dot = gtk::Button::new();
+            dot.add_css_class("cc-dot");
+            dot.set_valign(gtk::Align::Center);
+            dot.set_tooltip_text(Some(&format!("Page {}", i + 1)));
+            let w = self.me.borrow().clone();
+            dot.connect_clicked(move |_| {
+                if let Some(p) = w.upgrade() {
+                    p.go_to(i);
+                }
+            });
+            // Drop a tile on a dot to move it to that page.
+            if editing {
+                self.drop_target(&dot, Some(i), None);
+            }
+            self.dots.append(&dot);
+        }
+        if editing {
+            let add = ui::icon_button("list-add-symbolic", "Add a page");
+            add.add_css_class("cc-dot-add");
+            let w = self.me.borrow().clone();
+            add.connect_clicked(move |_| {
+                if let Some(p) = w.upgrade() {
+                    p.config.borrow_mut().pages.push(Page::default());
+                    let last = p.config.borrow().pages.len() - 1;
+                    p.save();
+                    p.rebuild();
+                    p.go_to(last);
+                }
+            });
+            self.dots.append(&add);
+        }
+        self.dots.set_visible(editing || pages.len() > 1);
+        self.fill_tray();
+        self.go_to(self.page.get());
+    }
+
+    fn save(&self) {
+        let path = config_path();
+        if let Some(dir) = path.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let tmp = path.with_extension("toml.tmp");
+        let text = toml::to_string_pretty(&*self.config.borrow()).unwrap_or_default();
+        if std::fs::write(&tmp, text).and_then(|_| std::fs::rename(&tmp, &path)).is_err() {
+            eprintln!("nyx-control-center: couldn't save the layout to {}", path.display());
+        }
+    }
+
+    fn set_editing(&self, on: bool) {
+        self.editing.set(on);
+        if let Some((normal, edit)) = self.head.borrow().as_ref() {
+            normal.set_visible(!on);
+            edit.set_visible(on);
+        }
+        self.tray.set_visible(on);
+        if !on {
+            let mut c = self.config.borrow_mut();
+            layout::tidy(&mut c.pages);
+            drop(c);
+            self.save();
+        }
+        self.rebuild();
+    }
+
+    /// Change the layout, save it and redraw.
+    fn edit(&self, f: impl FnOnce(&mut Vec<Page>)) {
+        f(&mut self.config.borrow_mut().pages);
+        self.save();
+        self.rebuild();
+    }
+
+    /// Accept a dragged tile: onto a page dot (`page`, at its end) or before a tile
+    /// (`page` and `before`).
+    fn drop_target(&self, w: &impl IsA<gtk::Widget>, page: Option<usize>, before: Option<usize>) {
+        let target = gtk::DropTarget::new(glib::BoxedAnyObject::static_type(), gdk::DragAction::MOVE);
+        let me = self.me.borrow().clone();
+        target.connect_drop(move |_, value, _, _| {
+            let (Some(p), Ok(obj)) = (me.upgrade(), value.get::<glib::BoxedAnyObject>()) else { return false };
+            let Ok(from) = obj.try_borrow::<TileDrag>() else { return false };
+            let (fp, fi) = (from.0, from.1);
+            let to_page = page.unwrap_or(fp);
+            let mut to_index = before.unwrap_or(usize::MAX);
+            // Moving later in the same page: the tile's own place closes up first.
+            if to_page == fp && to_index != usize::MAX && fi < to_index {
+                to_index -= 1;
+            }
+            p.edit(|pages| {
+                layout::move_tile(pages, (fp, fi), to_page, to_index);
+            });
+            true
+        });
+        w.add_controller(target);
+    }
+
+    /// The widgets that aren't on any page yet, to add to this one.
+    fn fill_tray(&self) {
+        while let Some(c) = self.tray.first_child() {
+            self.tray.remove(&c);
+        }
+        if !self.editing.get() {
+            return;
+        }
+        let used: Vec<String> =
+            self.config.borrow().pages.iter().flat_map(|p| p.tiles.iter().map(|t| t.widget.clone())).collect();
+        let free: Vec<tiles::Kind> = tiles::kinds().into_iter().filter(|k| !used.iter().any(|u| u == k.id)).collect();
+        let head = gtk::Label::new(Some(if free.is_empty() { "EVERY WIDGET IS ON A PAGE" } else { "ADD WIDGETS" }));
+        head.add_css_class("cc-group");
+        head.set_xalign(0.0);
+        self.tray.append(&head);
+        let grid = gtk::FlowBox::new();
+        grid.add_css_class("cc-tray");
+        grid.set_selection_mode(gtk::SelectionMode::None);
+        grid.set_min_children_per_line(3);
+        grid.set_max_children_per_line(3);
+        grid.set_homogeneous(true);
+        grid.set_column_spacing(8);
+        grid.set_row_spacing(8);
+        for k in free {
+            let card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+            card.add_css_class("cc-tray-card");
+            let top = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+            let (chip, _) = ui::chip(k.icon);
+            top.append(&chip);
+            let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+            spacer.set_hexpand(true);
+            top.append(&spacer);
+            let add = ui::icon_button("list-add-symbolic", &format!("Add {}", k.name));
+            add.add_css_class("cc-tray-add");
+            top.append(&add);
+            card.append(&top);
+            card.append(&label(k.name, "cc-title"));
+            let sizes: Vec<String> = k.sizes.iter().map(|s| s.to_string().replace('x', "×")).collect();
+            card.append(&label(&sizes.join(" · "), "cc-status"));
+            let (me, id, size) = (self.me.borrow().clone(), k.id, k.sizes[0]);
+            add.connect_clicked(move |_| {
+                if let Some(p) = me.upgrade() {
+                    let page = p.page.get();
+                    p.edit(|pages| {
+                        if let Some(pg) = pages.get_mut(page) {
+                            pg.tiles.push(layout::Tile::new(id, size));
+                        }
+                    });
+                }
+            });
+            grid.insert(&card, -1);
+            if let Some(child) = grid.last_child() {
+                child.set_focusable(false);
+            }
+        }
+        self.tray.append(&grid);
     }
 
     fn open_detail(&self, which: Detail, back: Rc<dyn Fn()>) {
@@ -275,8 +455,15 @@ pub fn build(app: &gtk::Application, only: Option<String>) -> Rc<Panel> {
         page: Cell::new(0),
         only,
         remember: config.remember_page,
+        config: RefCell::new(config),
+        ctx: RefCell::default(),
+        editing: Cell::new(false),
+        head: RefCell::default(),
+        tray: gtk::Box::new(gtk::Orientation::Vertical, 0),
+        me: RefCell::default(),
         panel1: RefCell::default(),
     });
+    *panel.me.borrow_mut() = Rc::downgrade(&panel);
 
     let weak = Rc::downgrade(&panel);
     let ctx = Ctx {
@@ -307,32 +494,34 @@ pub fn build(app: &gtk::Application, only: Option<String>) -> Rc<Panel> {
     };
 
     // Header: who's here, battery, and the panel's own actions.
-    root.append(&header(&ctx));
+    let (head, normal, edit) = header(&ctx, weak.clone());
+    root.append(&head);
+    *panel.head.borrow_mut() = Some((normal, edit));
+    *panel.ctx.borrow_mut() = Some(ctx.clone());
 
     // Dashboard: pages of tiles, swiped or picked by their dots.
     let dash = gtk::Box::new(gtk::Orientation::Vertical, 0);
     dash.add_css_class("cc-dashboard");
-    for (i, page) in config.pages.iter().enumerate() {
-        pages.add_named(&page_grid(&ctx, page), Some(&format!("page-{i}")));
-        let dot = gtk::Button::new();
-        dot.add_css_class("cc-dot");
-        dot.set_tooltip_text(Some(&format!("Page {}", i + 1)));
-        let w = weak.clone();
-        dot.connect_clicked(move |_| {
-            if let Some(p) = w.upgrade() {
-                p.go_to(i);
-            }
-        });
-        dots.append(&dot);
-    }
-    dots.set_visible(config.pages.len() > 1);
     dash.append(&pages);
+    panel.tray.add_css_class("cc-tray-area");
+    panel.tray.set_visible(false);
     let spacer = gtk::Box::new(gtk::Orientation::Vertical, 0);
     spacer.set_vexpand(true);
-    dash.append(&spacer);
-    dash.append(&dots);
-    content.add_named(&dash, Some("dashboard"));
+    // In edit mode the tray can be long: the dashboard scrolls.
+    let scroll_area = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    scroll_area.append(&dash);
+    scroll_area.append(&panel.tray);
+    let scroller = gtk::ScrolledWindow::new();
+    scroller.set_hscrollbar_policy(gtk::PolicyType::Never);
+    scroller.set_propagate_natural_height(true);
+    scroller.set_vexpand(true);
+    scroller.set_child(Some(&scroll_area));
+    let column = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    column.append(&scroller);
+    column.append(&dots);
+    content.add_named(&column, Some("dashboard"));
     root.append(&content);
+    panel.rebuild();
     panel.go_to(0);
 
     // Swipe or scroll sideways to change page.
@@ -378,6 +567,8 @@ pub fn build(app: &gtk::Application, only: Option<String>) -> Rc<Panel> {
         if let Some(p) = w.upgrade() {
             if p.content.visible_child_name().as_deref() == Some("detail") {
                 p.back();
+            } else if p.editing.get() {
+                p.set_editing(false);
             } else {
                 p.hide();
             }
@@ -426,7 +617,7 @@ pub fn build(app: &gtk::Application, only: Option<String>) -> Rc<Panel> {
     panel
 }
 
-fn header(ctx: &Ctx) -> gtk::Widget {
+fn header(ctx: &Ctx, panel: std::rc::Weak<Panel>) -> (gtk::Widget, gtk::Box, gtk::Box) {
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
     row.add_css_class("cc-header");
     let real = glib::real_name().to_string_lossy().to_string();
@@ -471,12 +662,60 @@ fn header(ctx: &Ctx) -> gtk::Widget {
         hide();
         ui::launch(&["omarchy-menu", "toggle", "system"]);
     });
-    row.append(&settings);
-    row.append(&power_button);
-    row.upcast()
+    let normal = gtk::Box::new(gtk::Orientation::Horizontal, 2);
+    let edit = icon_button("document-edit-symbolic", "Edit the dashboard");
+    let p = panel.clone();
+    edit.connect_clicked(move |_| {
+        if let Some(p) = p.upgrade() {
+            p.set_editing(true);
+        }
+    });
+    normal.append(&edit);
+    normal.append(&settings);
+    normal.append(&power_button);
+    row.append(&normal);
+
+    let editing = gtk::Box::new(gtk::Orientation::Horizontal, 2);
+    editing.set_visible(false);
+    // Restoring the default layout throws edits away: the first click asks, the second does.
+    let restore = icon_button("edit-undo-symbolic", "Restore the default layout");
+    let p = panel.clone();
+    restore.connect_clicked(move |b| {
+        if b.has_css_class("armed") {
+            if let Some(p) = p.upgrade() {
+                p.edit(|pages| *pages = tiles::default_pages());
+            }
+            b.remove_css_class("armed");
+            b.set_tooltip_text(Some("Restore the default layout"));
+        } else {
+            b.add_css_class("armed");
+            b.set_tooltip_text(Some("Click again to restore the default layout"));
+            let bw = b.downgrade();
+            glib::timeout_add_local_once(std::time::Duration::from_secs(4), move || {
+                if let Some(b) = bw.upgrade() {
+                    b.remove_css_class("armed");
+                    b.set_tooltip_text(Some("Restore the default layout"));
+                }
+            });
+        }
+    });
+    let done = icon_button("object-select-symbolic", "Done (Esc)");
+    done.add_css_class("primary");
+    done.connect_clicked(move |_| {
+        if let Some(p) = panel.upgrade() {
+            p.set_editing(false);
+        }
+    });
+    editing.append(&restore);
+    editing.append(&done);
+    row.append(&editing);
+    (row.upcast(), normal, editing)
 }
 
-fn page_grid(ctx: &Ctx, page: &Page) -> gtk::Widget {
+/// A tile being dragged in edit mode: its page and place.
+struct TileDrag(usize, usize);
+
+fn page_grid(ctx: &Ctx, page: &Page, page_index: usize, editing: bool, panel: std::rc::Weak<Panel>) -> gtk::Widget {
     let grid = gtk::Grid::new();
     grid.add_css_class("cc-grid");
     grid.set_column_homogeneous(true);
@@ -485,13 +724,86 @@ fn page_grid(ctx: &Ctx, page: &Page) -> gtk::Widget {
     grid.set_row_spacing(10);
     grid.set_valign(gtk::Align::Start);
     // Unknown widgets (from a newer version, or a typo) are skipped, not fatal.
-    let known: Vec<(&layout::Tile, tiles::Kind)> =
-        page.tiles.iter().filter_map(|t| tiles::kind(&t.widget).map(|k| (t, k))).collect();
+    let known: Vec<(usize, &layout::Tile, tiles::Kind)> =
+        page.tiles.iter().enumerate().filter_map(|(i, t)| tiles::kind(&t.widget).map(|k| (i, t, k))).collect();
     let sizes: Vec<layout::Size> =
-        known.iter().map(|(t, k)| if k.sizes.contains(&t.size) { t.size } else { k.sizes[0] }).collect();
-    for ((t, k), at) in known.iter().zip(layout::pack(&sizes)) {
-        let w = (k.build)(ctx, at.size, t);
+        known.iter().map(|(_, t, k)| if k.sizes.contains(&t.size) { t.size } else { k.sizes[0] }).collect();
+    for ((index, t, k), at) in known.iter().zip(layout::pack(&sizes)) {
+        let tile = (k.build)(ctx, at.size, t);
+        let w: gtk::Widget = if editing { edit_cell(tile, *index, page_index, k, at.size, &panel) } else { tile };
         grid.attach(&w, at.col as i32, at.row as i32, at.size.cols as i32, at.size.rows as i32);
     }
+    if editing && known.is_empty() {
+        let empty = label("Add widgets from below, or drag one here", "cc-status");
+        empty.set_xalign(0.5);
+        empty.add_css_class("cc-empty-page");
+        grid.attach(&empty, 0, 0, 4, 1);
+        if let Some(p) = panel.upgrade() {
+            p.drop_target(&empty, Some(page_index), None);
+        }
+    }
     grid.upcast()
+}
+
+/// A tile in edit mode: not clickable itself, with remove and resize buttons, dragged
+/// to move (before another tile, or onto a page dot).
+fn edit_cell(
+    tile: gtk::Widget,
+    index: usize,
+    page: usize,
+    kind: &tiles::Kind,
+    size: layout::Size,
+    panel: &std::rc::Weak<Panel>,
+) -> gtk::Widget {
+    tile.set_can_target(false);
+    let cell = gtk::Overlay::new();
+    cell.add_css_class("cc-edit-cell");
+    cell.set_child(Some(&tile));
+    let remove = icon_button("window-close-symbolic", &format!("Remove {}", kind.name));
+    remove.add_css_class("cc-edit-remove");
+    remove.set_halign(gtk::Align::Start);
+    remove.set_valign(gtk::Align::Start);
+    let p = panel.clone();
+    remove.connect_clicked(move |_| {
+        if let Some(p) = p.upgrade() {
+            p.edit(|pages| {
+                layout::remove_tile(pages, page, index);
+            });
+        }
+    });
+    cell.add_overlay(&remove);
+    if kind.sizes.len() > 1 {
+        let next = layout::next_size(kind.sizes, size);
+        let resize = icon_button("view-fullscreen-symbolic", &format!("Size {size} (click for {next})").replace('x', "×"));
+        resize.add_css_class("cc-edit-resize");
+        resize.set_halign(gtk::Align::End);
+        resize.set_valign(gtk::Align::End);
+        let p = panel.clone();
+        resize.connect_clicked(move |_| {
+            if let Some(p) = p.upgrade() {
+                p.edit(|pages| {
+                    if let Some(t) = pages.get_mut(page).and_then(|pg| pg.tiles.get_mut(index)) {
+                        t.size = next;
+                    }
+                });
+            }
+        });
+        cell.add_overlay(&resize);
+    }
+    let drag = gtk::DragSource::new();
+    drag.set_actions(gdk::DragAction::MOVE);
+    drag.connect_prepare(move |_, _, _| {
+        Some(gdk::ContentProvider::for_value(&glib::BoxedAnyObject::new(TileDrag(page, index)).to_value()))
+    });
+    let tw = tile.downgrade();
+    drag.connect_drag_begin(move |src, _| {
+        if let Some(t) = tw.upgrade() {
+            src.set_icon(Some(&gtk::WidgetPaintable::new(Some(&t))), t.width() / 2, t.height() / 2);
+        }
+    });
+    cell.add_controller(drag);
+    if let Some(p) = panel.upgrade() {
+        p.drop_target(&cell, Some(page), Some(index));
+    }
+    cell.upcast()
 }

@@ -353,3 +353,74 @@ window.nyx-control-center .cc-app-volume {
 tooltip {
   border-radius: 7px;
 }
+
+/* ---------- Edit mode ---------- */
+
+window.nyx-control-center .cc-edit-cell > .cc-tile {
+  outline: 1px dashed alpha(@theme_text, 0.25);
+  outline-offset: -1px;
+}
+
+window.nyx-control-center button.cc-edit-remove,
+window.nyx-control-center button.cc-edit-resize {
+  min-width: 22px;
+  min-height: 22px;
+  margin: -6px;
+  border-radius: 999px;
+  background: @theme_raised;
+  color: @theme_text;
+  border: 1px solid @theme_border;
+  box-shadow: 0 1px 3px alpha(black, 0.3);
+}
+
+window.nyx-control-center button.cc-edit-resize {
+  margin: 4px;
+  background: none;
+  border: none;
+  box-shadow: none;
+  color: @theme_text_tertiary;
+}
+
+window.nyx-control-center button.cc-edit-remove:hover {
+  color: @theme_danger;
+}
+
+window.nyx-control-center button.cc-icon-button.primary {
+  background: @theme_accent;
+  color: @theme_on_accent;
+}
+
+window.nyx-control-center button.cc-icon-button.armed {
+  color: @theme_danger;
+}
+
+window.nyx-control-center .cc-tray-area {
+  margin-top: 12px;
+  padding-top: 4px;
+  border-top: 1px solid @theme_divider;
+}
+
+window.nyx-control-center .cc-tray-card {
+  background: @theme_card;
+  border-radius: 11px;
+  padding: 10px;
+}
+
+window.nyx-control-center button.cc-tray-add {
+  min-width: 22px;
+  min-height: 22px;
+  border-radius: 999px;
+  background: @theme_accent;
+  color: @theme_on_accent;
+}
+
+window.nyx-control-center button.cc-dot-add {
+  min-width: 18px;
+  min-height: 18px;
+}
+
+window.nyx-control-center .cc-empty-page {
+  min-height: 82px;
+  border: 1px dashed alpha(@theme_accent, 0.5);
+  border-radius: 11px;
+}

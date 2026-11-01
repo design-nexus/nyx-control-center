@@ -35,10 +35,7 @@ pub struct Mode {
 
 pub struct Kind {
     pub id: &'static str,
-    // Shown when adding widgets in edit mode.
-    #[allow(dead_code)]
     pub name: &'static str,
-    #[allow(dead_code)]
     pub icon: &'static str,
     pub sizes: &'static [Size],
     pub build: fn(&Ctx, Size, &Tile) -> gtk::Widget,

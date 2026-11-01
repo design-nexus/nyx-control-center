@@ -10,6 +10,8 @@ bin="$HOME/.local/bin"
 config="${XDG_CONFIG_HOME:-$HOME/.config}"
 systemctl --user disable --now nyx-control-center.service 2>/dev/null || true
 rm -f "$bin/nyx-control-center" "$config/systemd/user/nyx-control-center.service"
+omarchy-plugin-disable design-nexus.control-center >/dev/null 2>&1 || true
+rm -rf "$config/omarchy/plugins/design-nexus.control-center"
 systemctl --user daemon-reload 2>/dev/null || true
 if [[ ${1:-} == --purge ]]; then
   rm -f "$config/nyx/control-center.toml"

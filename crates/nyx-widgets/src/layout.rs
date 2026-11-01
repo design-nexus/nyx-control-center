@@ -130,6 +130,28 @@ pub fn move_tile(pages: &mut [Page], from: (usize, usize), to_page: usize, to_in
     true
 }
 
+/// Remove a tile. Returns it.
+pub fn remove_tile(pages: &mut [Page], page: usize, index: usize) -> Option<Tile> {
+    let p = pages.get_mut(page)?;
+    (index < p.tiles.len()).then(|| p.tiles.remove(index))
+}
+
+/// The size after `current` in a widget's list of sizes (wrapping round).
+pub fn next_size(sizes: &[Size], current: Size) -> Size {
+    match sizes.iter().position(|s| *s == current) {
+        Some(i) => sizes[(i + 1) % sizes.len()],
+        None => sizes.first().copied().unwrap_or(current),
+    }
+}
+
+/// Drop empty pages, keeping at least one.
+pub fn tidy(pages: &mut Vec<Page>) {
+    pages.retain(|p| !p.tiles.is_empty());
+    if pages.is_empty() {
+        pages.push(Page::default());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -177,6 +199,18 @@ mod tests {
         assert_eq!(pages[0].tiles.iter().map(|t| t.widget.as_str()).collect::<Vec<_>>(), vec!["b"]);
         assert_eq!(pages[1].tiles.iter().map(|t| t.widget.as_str()).collect::<Vec<_>>(), vec!["a", "c"]);
         assert!(!move_tile(&mut pages, (5, 0), 0, 0));
+    }
+
+    #[test]
+    fn editing() {
+        let mut pages = vec![Page { tiles: vec![Tile::new("a", Size::S2X1)] }, Page::default()];
+        assert_eq!(next_size(&[Size::S2X1, Size::S1X1], Size::S2X1), Size::S1X1);
+        assert_eq!(next_size(&[Size::S2X1, Size::S1X1], Size::S1X1), Size::S2X1, "wraps");
+        assert_eq!(next_size(&[Size::S2X1], Size::S4X1), Size::S2X1, "an unknown size goes to the first");
+        assert_eq!(remove_tile(&mut pages, 0, 0).map(|t| t.widget), Some("a".into()));
+        assert!(remove_tile(&mut pages, 0, 0).is_none());
+        tidy(&mut pages);
+        assert_eq!(pages.len(), 1, "always one page");
     }
 
     #[test]

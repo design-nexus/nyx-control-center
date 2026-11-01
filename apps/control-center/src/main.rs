@@ -18,7 +18,15 @@ use std::rc::Rc;
 pub const APP_ID: &str = "io.github.design_nexus.nyx.ControlCenter";
 
 fn main() -> std::process::ExitCode {
-    let app = gtk::Application::builder().application_id(APP_ID).flags(gio::ApplicationFlags::HANDLES_COMMAND_LINE).build();
+    // A test copy (`--only <output>`) is separate: its own id, never the running panel.
+    let test = std::env::args().any(|a| a == "--only");
+    let (id, mut flags) = if test {
+        (format!("{APP_ID}.Test"), gio::ApplicationFlags::NON_UNIQUE)
+    } else {
+        (APP_ID.to_string(), gio::ApplicationFlags::empty())
+    };
+    flags |= gio::ApplicationFlags::HANDLES_COMMAND_LINE;
+    let app = gtk::Application::builder().application_id(id).flags(flags).build();
     let panel: Rc<RefCell<Option<Rc<panel::Panel>>>> = Rc::default();
     app.connect_startup(|app| {
         theme::install();
