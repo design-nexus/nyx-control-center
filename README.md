@@ -16,7 +16,8 @@ It runs as a user service and stays hidden until you open it:
 nyx-control-center --toggle     # open or close (bind a key to this)
 ```
 
-Click outside it or press Esc to close it.
+Click outside it or press Esc to close it. A bar button is installed too; add it to the
+bar from Settings → Plugins (or `omarchy-plugin-enable design-nexus.control-center right`).
 
 ## What it does
 
@@ -25,11 +26,17 @@ Click outside it or press Esc to close it.
   connection; connect or disconnect paired devices; turn VPNs and Tailscale on or off).
 - **Sound and brightness** sliders. The speaker button opens outputs and each app's
   volume; the output button mutes.
+- **Home**: a room's lights and devices from Nyx Home (pick the room from the tile's
+  header), with its scenes. Click to switch a device; right-click a light for brightness
+  and colour. Home's service (`nyx-homed`) does the talking to Home Assistant, so Home
+  needn't be open.
 - **Now playing** from any player (Nyx Music, browsers, …) with its controls.
 - **Power mode** (power saver, balanced, performance) and the battery.
 - **Omarchy's switches**: Do not disturb, Night light, Keep awake, the workspace's mode
   (tiling, scrolling, floating; a click goes to the next), keyboard light, and a
   screenshot.
+- **Edit mode** (the pencil): remove tiles, change their size, drag them to reorder or
+  onto a page dot to move them, add widgets and pages, or restore the default layout.
 - Pages of tiles: swipe or scroll sideways, or click the dots. It opens on the page you
   left (unless you turn that off).
 - Opening it closes the Nyx Notification Center, and the other way round.
@@ -65,6 +72,7 @@ sizes they come in:
 | --- | --- |
 | `wifi`, `bluetooth`, `vpn` | 2x1 (with details), 1x1 |
 | `sound` (volume and brightness) | 4x1, 2x1 |
+| `home` | 2x2, 4x2 |
 | `media`, `power` | 2x1, 4x1 |
 | `dnd`, `mode`, `night-light`, `keep-awake`, `keyboard-light`, `capture`, `battery` | 1x1, 2x1 |
 

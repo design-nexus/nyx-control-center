@@ -18,6 +18,8 @@ pub struct Ctx {
     pub hide: Rc<dyn Fn()>,
     /// The active workspace's Omarchy mode.
     pub mode: Live<Mode>,
+    /// Remember a tile's setting in the layout file: (widget, key, value).
+    pub set_option: Rc<dyn Fn(&str, &str, &str)>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,6 +70,7 @@ pub fn kinds() -> Vec<Kind> {
             sizes: &[S::S4X1, S::S2X1],
             build: sound,
         },
+        Kind { id: "home", name: "Home", icon: "go-home-symbolic", sizes: &[S::S2X2, S::S4X2], build: crate::home_tile::build },
         Kind {
             id: "media",
             name: "Now playing",
@@ -125,6 +128,7 @@ pub fn default_pages() -> Vec<Page> {
                 t("dnd", S::S1X1),
                 t("mode", S::S1X1),
                 t("sound", S::S4X1),
+                t("home", S::S2X2),
                 t("media", S::S2X1),
                 t("power", S::S2X1),
                 t("night-light", S::S1X1),
@@ -139,7 +143,7 @@ pub fn default_pages() -> Vec<Page> {
 
 // ---------- Tile shapes ----------
 
-fn frame(size: Size) -> gtk::Box {
+pub fn frame(size: Size) -> gtk::Box {
     let b = gtk::Box::new(gtk::Orientation::Vertical, 0);
     b.add_css_class("cc-tile");
     b.add_css_class(&format!("cc-{}x{}", size.cols, size.rows));

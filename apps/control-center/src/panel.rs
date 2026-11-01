@@ -491,6 +491,18 @@ pub fn build(app: &gtk::Application, only: Option<String>) -> Rc<Panel> {
             })
         },
         mode: mode_live(),
+        set_option: {
+            let weak = weak.clone();
+            Rc::new(move |widget: &str, key: &str, value: &str| {
+                let Some(p) = weak.upgrade() else { return };
+                let mut c = p.config.borrow_mut();
+                if let Some(t) = c.pages.iter_mut().flat_map(|pg| pg.tiles.iter_mut()).find(|t| t.widget == widget) {
+                    t.options.insert(key.into(), value.into());
+                }
+                drop(c);
+                p.save();
+            })
+        },
     };
 
     // Header: who's here, battery, and the panel's own actions.

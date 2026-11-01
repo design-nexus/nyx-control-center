@@ -424,3 +424,89 @@ window.nyx-control-center .cc-empty-page {
   border: 1px dashed alpha(@theme_accent, 0.5);
   border-radius: 11px;
 }
+
+/* ---------- Home ---------- */
+
+window.nyx-control-center .cc-home {
+  padding: 8px 10px 10px;
+}
+
+window.nyx-control-center .cc-home-head {
+  margin-bottom: 6px;
+}
+
+window.nyx-control-center .cc-home-icon {
+  color: @theme_success;
+}
+
+window.nyx-control-center menubutton.cc-room > button {
+  min-height: 26px;
+  padding: 0 6px;
+  border-radius: 7px;
+  background: none;
+  box-shadow: none;
+  font-weight: 500;
+}
+
+window.nyx-control-center .cc-device {
+  min-height: 50px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  background: alpha(@theme_text, 0.035);
+}
+
+window.nyx-control-center .cc-device image {
+  color: @theme_dim_text;
+}
+
+window.nyx-control-center .cc-device.on.cc-tint-warm {
+  background: mix(@theme_card, @theme_warning, 0.2);
+}
+
+window.nyx-control-center .cc-device.on.cc-tint-warm image {
+  color: @theme_warning;
+}
+
+window.nyx-control-center .cc-device-name {
+  font-size: 11.5px;
+  font-weight: 500;
+  margin-top: 4px;
+}
+
+window.nyx-control-center .cc-device-status {
+  font-size: 10.5px;
+  color: @theme_dim_text;
+  font-feature-settings: "tnum";
+}
+
+window.nyx-control-center .cc-scenes {
+  margin-top: 6px;
+}
+
+window.nyx-control-center button.cc-scene {
+  min-height: 24px;
+  padding: 0 9px;
+  border-radius: 7px;
+  background: alpha(@theme_text, 0.035);
+  box-shadow: none;
+  color: @theme_dim_text;
+  font-size: 11.5px;
+}
+
+window.nyx-control-center button.cc-scene:hover {
+  background: alpha(@theme_success, 0.18);
+  color: @theme_success;
+}
+
+window.nyx-control-center button.cc-swatch {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border-radius: 999px;
+  border: 1px solid @theme_border;
+}
+
+.cc-light-popover {
+  padding: 6px;
+  min-width: 240px;
+}

@@ -9,12 +9,14 @@
 //! | [`audio`] | PipeWire through `pactl` | `pactl subscribe` |
 //! | [`power`] | power-profiles-daemon, UPower (D-Bus) | D-Bus signals |
 //! | [`brightness`] | `brightnessctl` | read while shown, every 2 s |
+//! | [`home`] | Nyx Home's service (`Home.Devices1`) | read every 3 s while shown |
 //! | [`media`] | MPRIS players (D-Bus) | D-Bus signals |
 //! | [`omarchy`] | Omarchy's toggles and state files | file monitors |
 
 pub mod audio;
 pub mod bluetooth;
 pub mod brightness;
+pub mod home;
 pub mod media;
 pub mod network;
 pub mod omarchy;

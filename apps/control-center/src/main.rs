@@ -5,6 +5,7 @@
 //! `--only <output>` keeps it on one output (for trying it on a test output).
 
 mod details;
+mod home_tile;
 mod panel;
 mod theme;
 mod tiles;
