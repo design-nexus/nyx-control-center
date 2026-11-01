@@ -1,0 +1,12 @@
+[package]
+name = "nyx-widgets"
+version = "0.1.0"
+description = "Nyx widget framework: live values, tile sizes and page layouts, shared by the Control Center and desktop widgets"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+toml = "1"

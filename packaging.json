@@ -1,0 +1,18 @@
+{
+  "application": "control-center",
+  "directory": "control-center",
+  "packages": [
+    "nyx-control-center"
+  ],
+  "manifest": "Cargo.toml",
+  "prepare": [],
+  "binaries": [],
+  "test_commands": [
+    [
+      "cargo",
+      "test",
+      "--locked",
+      "--workspace"
+    ]
+  ]
+}
