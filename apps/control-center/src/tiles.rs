@@ -9,6 +9,9 @@ use nyx_widgets::layout::{Page, Size, Tile};
 use nyx_widgets::live::Live;
 use std::rc::Rc;
 
+/// Save a tile's setting: (widget, key, value).
+pub type SetOption = Rc<dyn Fn(&str, &str, &str)>;
+
 /// What a tile can ask of the panel.
 #[derive(Clone)]
 pub struct Ctx {
@@ -19,7 +22,7 @@ pub struct Ctx {
     /// The active workspace's Omarchy mode.
     pub mode: Live<Mode>,
     /// Remember a tile's setting in the layout file: (widget, key, value).
-    pub set_option: Rc<dyn Fn(&str, &str, &str)>,
+    pub set_option: SetOption,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
