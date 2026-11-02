@@ -249,6 +249,90 @@ pub async fn nord_countries() -> Vec<String> {
     v
 }
 
+/// NordVPN's cities in a country (`Sweden`, `United_States`).
+pub async fn nord_cities(country: &str) -> Vec<String> {
+    let Some(t) = output(&["nordvpn", "cities", country]).await else { return Vec::new() };
+    let mut v: Vec<String> = t
+        .split([',', '\t', '\n'])
+        .map(|s| s.trim().trim_start_matches('-').trim())
+        .filter(|s| !s.is_empty() && s.chars().all(|c| c.is_alphanumeric() || c == '_'))
+        .map(String::from)
+        .collect();
+    v.sort();
+    v.dedup();
+    v
+}
+
+/// Pause NordVPN for `5m`, `15m`, `30m`, `1h` or `24h` (it reconnects by itself).
+pub async fn nord_pause(duration: &str) -> Result<(), String> {
+    done(run(&["nordvpn", "pause", duration], None).await).await
+}
+
+/// A NordVPN setting with a value: `technology NORDLYNX`, `protocol udp`.
+pub async fn nord_set_value(name: &str, value: &str) -> Result<(), String> {
+    done(run(&["nordvpn", "set", name, value], None).await).await
+}
+
+/// NordVPN's current technology (`NORDLYNX`, `OPENVPN`, `NORDWHISPER`).
+pub async fn nord_technology() -> Option<String> {
+    let t = output(&["nordvpn", "settings"]).await?;
+    t.lines().find_map(|l| l.strip_prefix("Technology:").map(|v| v.trim().to_uppercase()))
+}
+
+/// The countries Tor has exit relays in, most relays first: `(code, relays)`. Slow (it
+/// asks Tor about every relay); only while Tor runs.
+pub async fn tor_exit_countries() -> Vec<(String, usize)> {
+    let Some(t) = output(&["tormarchy", "exit", "--list"]).await else { return Vec::new() };
+    parse_exit_countries(&t)
+}
+
+/// Lines like `250-ip-to-country/1.2.3.4=de`.
+pub fn parse_exit_countries(text: &str) -> Vec<(String, usize)> {
+    let mut counts: std::collections::BTreeMap<String, usize> = Default::default();
+    for line in text.lines() {
+        if let Some((_, cc)) = line.split_once('=') {
+            let cc = cc.trim().to_lowercase();
+            if cc.len() == 2 && cc.chars().all(|c| c.is_ascii_alphabetic()) && cc != "??" {
+                *counts.entry(cc).or_default() += 1;
+            }
+        }
+    }
+    let mut v: Vec<(String, usize)> = counts.into_iter().collect();
+    v.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    v
+}
+
+/// One latency measurement through the circuit, in ms.
+pub async fn tor_latency() -> Option<f64> {
+    let t = output(&["tormarchy", "speed", "--json"]).await?;
+    let v: serde_json::Value = serde_json::from_str(&t).ok()?;
+    if v["ok"].as_bool() != Some(true) {
+        return None;
+    }
+    v["latencyMs"].as_f64()
+}
+
+/// Bridges (for networks that block Tor): on, off, and whether any are set up.
+pub async fn tor_bridges() -> Option<(bool, bool)> {
+    let t = output(&["tormarchy", "bridge", "status"]).await?;
+    let on = t.contains("Bridges: on");
+    Some((on, !t.contains("none configured")))
+}
+
+pub async fn tor_set_bridges(on: bool) -> Result<(), String> {
+    done(run(&["tormarchy", "bridge", if on { "on" } else { "off" }], None).await).await
+}
+
+/// A browser that can reach nothing but Tor.
+pub fn tor_browser() {
+    crate::spawn(&["tormarchy", "browser"]);
+}
+
+/// Remove every Tor firewall rule now: the escape hatch if the network is stuck.
+pub async fn tor_panic() -> Result<(), String> {
+    done(run(&["tormarchy", "panic"], None).await).await
+}
+
 /// Tor, in `mode`. A mode that carries traffic takes NordVPN down first.
 pub async fn tor(mode: TorMode) -> Result<(), String> {
     let st = live().get();
@@ -289,6 +373,14 @@ mod tests {
         assert!(n.connected());
         assert_eq!((n.country.as_str(), n.city.as_str(), n.server.as_str()), ("Sweden", "Stockholm", "Sweden #512"));
         assert!(!parse_nord("Status: Disconnected\n").connected());
+    }
+
+    #[test]
+    fn counts_exit_countries() {
+        let v = parse_exit_countries(
+            "250-ip-to-country/1.1.1.1=de\n250-ip-to-country/2.2.2.2=de\n250-ip-to-country/3.3.3.3=se\n250-ip-to-country/4.4.4.4=??\n250 OK\n",
+        );
+        assert_eq!(v, vec![("de".to_string(), 2), ("se".to_string(), 1)]);
     }
 
     #[test]

@@ -31,7 +31,7 @@ pub struct Config {
     pub version: u32,
 }
 
-const LAYOUT_VERSION: u32 = 2;
+const LAYOUT_VERSION: u32 = 3;
 
 /// Bring an older layout up to date. Version 2: the old `vpn` tile showed Tailscale, so
 /// it becomes `tailscale`, and the new `vpn` tile (NordVPN, Tor) goes beside it.
@@ -45,6 +45,19 @@ pub fn migrate(c: &mut Config) -> bool {
                 page.tiles[i].widget = "tailscale".into();
                 let size = page.tiles[i].size;
                 page.tiles.insert(i, layout::Tile::new("vpn", size));
+            }
+        }
+    }
+    if c.version < 3 {
+        // Up next (upcoming events) and Microphone are new: put them on the last page.
+        let has = |c: &Config, w: &str| c.pages.iter().any(|p| p.tiles.iter().any(|t| t.widget == w));
+        let add: Vec<(&str, layout::Size)> = [("upcoming", layout::Size::S4X2), ("microphone", layout::Size::S1X1)]
+            .into_iter()
+            .filter(|(w, _)| !has(c, w))
+            .collect();
+        if let Some(last) = c.pages.last_mut() {
+            for (w, size) in add {
+                last.tiles.push(layout::Tile::new(w, size));
             }
         }
     }
@@ -874,4 +887,27 @@ fn edit_cell(
         p.drop_target(&cell, Some(page), Some(index));
     }
     cell.upcast()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn layouts_migrate() {
+        let mut c = Config {
+            pages: vec![
+                Page { tiles: vec![layout::Tile::new("wifi", layout::Size::S2X1), layout::Tile::new("vpn", layout::Size::S2X1)] },
+                Page { tiles: vec![layout::Tile::new("battery", layout::Size::S1X1)] },
+            ],
+            remember_page: true,
+            version: 0,
+        };
+        assert!(migrate(&mut c));
+        let first: Vec<&str> = c.pages[0].tiles.iter().map(|t| t.widget.as_str()).collect();
+        assert_eq!(first, vec!["wifi", "vpn", "tailscale"], "the old VPN tile was Tailscale");
+        let last: Vec<&str> = c.pages[1].tiles.iter().map(|t| t.widget.as_str()).collect();
+        assert_eq!(last, vec!["battery", "upcoming", "microphone"]);
+        assert!(!migrate(&mut c), "once");
+    }
 }

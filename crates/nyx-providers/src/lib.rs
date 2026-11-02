@@ -19,6 +19,7 @@
 pub mod audio;
 pub mod bluetooth;
 pub mod brightness;
+pub mod calendar;
 pub mod display;
 pub mod dns;
 pub mod home;

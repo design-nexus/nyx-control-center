@@ -15,6 +15,7 @@ pub fn view(which: Detail, back: Rc<dyn Fn()>) -> gtk::Widget {
         Detail::Vpn => crate::route_tiles::vpn_view(back),
         Detail::Tailscale => crate::route_tiles::tailscale_view(back),
         Detail::Display => display_view(back),
+        Detail::Battery => battery_view(back),
     }
 }
 
@@ -533,6 +534,107 @@ fn bluetooth_view(back: Rc<dyn Fn()>) -> gtk::Widget {
     root.upcast()
 }
 
+// ---------- Battery ----------
+
+fn battery_view(back: Rc<dyn Fn()>) -> gtk::Widget {
+    use nyx_providers::power;
+    let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    root.add_css_class("cc-detail");
+    let (h, sw) = head("Battery", back);
+    sw.set_visible(false);
+    root.append(&h);
+    let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    root.append(&scrolled(&body));
+    let settings = icon_button("emblem-system-symbolic", "Power settings: suspend, lid, power button");
+    settings.connect_clicked(|_| ui::open_settings("power"));
+    root.append(&foot(&[settings]));
+    let facts = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    body.append(&facts);
+    let f = facts.clone();
+    let draw: Rc<dyn Fn()> = Rc::new(move || {
+        clear(&f);
+        let st = power::live().get();
+        let Some(b) = &st.battery else {
+            let l = label("No battery", "cc-empty");
+            l.set_xalign(0.5);
+            f.append(&l);
+            return;
+        };
+        let d = power::details().get().unwrap_or_default();
+        let state = match (b.charging, b.full, b.time) {
+            (_, true, _) => "Fully charged".to_string(),
+            (true, _, Some(t)) => format!("Charging, full in {}", power::duration(t)),
+            (true, _, None) => "Charging".to_string(),
+            (false, _, Some(t)) => format!("On battery, {} left", power::duration(t)),
+            (false, _, None) => "On battery".to_string(),
+        };
+        let c = card();
+        c.append(&row("battery-good-symbolic", &format!("{}%", b.percent.round()), Some(&state)));
+        f.append(&c);
+        let grid = gtk::Grid::new();
+        grid.add_css_class("cc-card");
+        grid.add_css_class("cc-facts");
+        grid.set_column_homogeneous(true);
+        grid.set_row_spacing(4);
+        grid.set_column_spacing(10);
+        let mut items: Vec<(&str, String)> = Vec::new();
+        if !d.rate.is_empty() && d.rate != "0W" {
+            items.push((if b.charging { "Charging at" } else { "Using" }, d.rate.clone()));
+        }
+        if !d.size.is_empty() {
+            items.push(("Capacity", d.size.clone()));
+        }
+        if let Some(cy) = d.cycles {
+            items.push(("Charge cycles", cy.to_string()));
+        }
+        if !d.threshold.is_empty() {
+            items.push(("Charge limit", d.threshold.clone()));
+        }
+        if !items.is_empty() {
+            f.append(&group("Details"));
+            for (i, (k, v)) in items.iter().enumerate() {
+                let cell = gtk::Box::new(gtk::Orientation::Vertical, 0);
+                cell.append(&label(k, "cc-fact-name"));
+                cell.append(&label(v, "cc-fact-value"));
+                grid.attach(&cell, (i % 2) as i32, (i / 2) as i32, 1, 1);
+            }
+            f.append(&grid);
+            if !d.threshold.is_empty() {
+                let note = label("Charging stops inside the limit to spare the battery.", "cc-row-sub");
+                note.set_wrap(true);
+                note.add_css_class("cc-note");
+                f.append(&note);
+            }
+        }
+    });
+    let d = draw.clone();
+    bind(&root, power::live(), move |_| d());
+    bind(&root, power::details(), move |_| draw());
+    // Power mode, the same three as the tile.
+    body.append(&group("Power mode"));
+    let c = card();
+    for (p, icon_name, title, desc) in [
+        (power::Profile::PowerSaver, "power-profile-power-saver-symbolic", "Power saver", "Longer battery life, slower"),
+        (power::Profile::Balanced, "power-profile-balanced-symbolic", "Balanced", "The everyday setting"),
+        (power::Profile::Performance, "power-profile-performance-symbolic", "Performance", "Fastest; more power, more heat"),
+    ] {
+        let r = row(icon_name, title, Some(desc));
+        let check = icon("object-select-symbolic", 14);
+        r.append(&check);
+        on_click(&r, move || act(power::set_profile(p)));
+        let (r2, ch) = (r.clone(), check.clone());
+        bind(&r, power::live(), move |st| {
+            let current = st.profile == Some(p);
+            set_class(&r2, "selected", current);
+            ch.set_visible(current);
+            r2.set_visible(st.profiles.is_empty() || st.profiles.contains(&p));
+        });
+        c.append(&r);
+    }
+    body.append(&c);
+    root.upcast()
+}
+
 // ---------- Display ----------
 
 fn display_view(back: Rc<dyn Fn()>) -> gtk::Widget {
@@ -656,25 +758,25 @@ fn display_view(back: Rc<dyn Fn()>) -> gtk::Widget {
         rest.append(&c);
 
         // The laptop's own screen, while another is plugged in.
-        if let Some(lap) = st.internal() {
-            if st.external_active() || !lap.enabled {
-                let c = card();
-                let r = row(
-                    "computer-symbolic",
-                    "Laptop screen",
-                    Some(if lap.enabled { "On" } else { "Off: the other screen shows everything" }),
-                );
-                let s = gtk::Switch::new();
-                s.set_valign(gtk::Align::Center);
-                s.set_active(lap.enabled);
-                s.connect_state_set(|_, on| {
-                    act(display::set_internal(on));
-                    glib::Propagation::Proceed
-                });
-                r.append(&s);
-                c.append(&r);
-                rest.append(&c);
-            }
+        if let Some(lap) = st.internal()
+            && (st.external_active() || !lap.enabled)
+        {
+            let c = card();
+            let r = row(
+                "computer-symbolic",
+                "Laptop screen",
+                Some(if lap.enabled { "On" } else { "Off: the other screen shows everything" }),
+            );
+            let s = gtk::Switch::new();
+            s.set_valign(gtk::Align::Center);
+            s.set_active(lap.enabled);
+            s.connect_state_set(|_, on| {
+                act(display::set_internal(on));
+                glib::Propagation::Proceed
+            });
+            r.append(&s);
+            c.append(&r);
+            rest.append(&c);
         }
     });
     root.upcast()

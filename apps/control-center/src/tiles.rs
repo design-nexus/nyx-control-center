@@ -32,6 +32,7 @@ pub enum Detail {
     Vpn,
     Tailscale,
     Display,
+    Battery,
 }
 
 impl Detail {
@@ -42,6 +43,7 @@ impl Detail {
             "vpn" => Some(Detail::Vpn),
             "tailscale" => Some(Detail::Tailscale),
             "display" => Some(Detail::Display),
+            "battery" => Some(Detail::Battery),
             _ => None,
         }
     }
@@ -96,6 +98,13 @@ pub fn kinds() -> Vec<Kind> {
             build: sound,
         },
         Kind { id: "home", name: "Home", icon: "go-home-symbolic", sizes: &[S::S2X3, S::S4X3], build: crate::home_tile::build },
+        Kind {
+            id: "upcoming",
+            name: "Up next",
+            icon: "x-office-calendar-symbolic",
+            sizes: &[S::S4X2, S::S2X2, S::S4X3],
+            build: upcoming,
+        },
         Kind { id: "media", name: "Now playing", icon: "audio-x-generic-symbolic", sizes: &[S::S4X2], build: media_tile },
         Kind {
             id: "power",
@@ -157,7 +166,7 @@ pub fn default_pages() -> Vec<Page> {
                 t("capture", S::S1X1),
             ],
         },
-        Page { tiles: vec![t("home", S::S4X3), t("battery", S::S1X1)] },
+        Page { tiles: vec![t("upcoming", S::S4X2), t("microphone", S::S1X1), t("battery", S::S1X1), t("home", S::S4X3)] },
     ]
 }
 
@@ -385,7 +394,8 @@ fn microphone(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
             (false, true) => format!("Microphone on ({}%). Click to mute", (st.mic_volume * 100.0).round()),
             (false, false) => format!("Recording now: {}. Click to mute the microphone", st.recording.join(", ")),
         }));
-        t.set_visible(!st.inputs.is_empty());
+        // Greyed out, not hidden: a hidden tile is never mapped, so it would miss updates.
+        t.set_sensitive(!st.inputs.is_empty() || !st.available);
     });
     tile.upcast()
 }
@@ -683,6 +693,92 @@ pub fn player_name(bus: &str) -> String {
     }
 }
 
+/// When an event is, said briefly: "in 12 min", "14:00", "Tomorrow 09:00", "Wed",
+/// "All day".
+pub fn event_when(e: &nyx_providers::calendar::Event, now: i64) -> String {
+    let local = |t: i64| glib::DateTime::from_unix_local(t).ok();
+    let (Some(start), Some(today)) = (local(e.starts), local(now)) else { return String::new() };
+    let days = (start.ymd().0 - today.ymd().0) * 366 + start.day_of_year() - today.day_of_year();
+    if e.all_day {
+        return match days {
+            ..=0 => "All day".into(),
+            1 => "Tomorrow".into(),
+            2..=6 => start.format("%A").map(|s| s.to_string()).unwrap_or_default(),
+            _ => start.format("%b %-d").map(|s| s.to_string()).unwrap_or_default(),
+        };
+    }
+    if e.starts <= now {
+        return "Now".into();
+    }
+    let mins = (e.starts - now) / 60;
+    if mins < 60 {
+        return format!("in {} min", mins.max(1));
+    }
+    let time = start.format("%H:%M").map(|s| s.to_string()).unwrap_or_default();
+    match days {
+        0 => time,
+        1 => format!("Tomorrow {time}"),
+        2..=6 => format!("{} {time}", start.format("%a").map(|s| s.to_string()).unwrap_or_default()),
+        _ => start.format("%b %-d").map(|s| s.to_string()).unwrap_or_default(),
+    }
+}
+
+/// Up next: the coming events from Nyx Calendar.
+fn upcoming(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
+    use nyx_providers::calendar;
+    let tile = frame(size);
+    tile.add_css_class("cc-upcoming");
+    tint(&tile, "red");
+    let head = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    head.add_css_class("cc-upcoming-head");
+    let i = icon("x-office-calendar-symbolic", 14);
+    head.append(&i);
+    head.append(&label("Up next", "cc-title"));
+    tile.append(&head);
+    let list = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    list.set_vexpand(true);
+    tile.append(&list);
+    let rows = if size.rows >= 3 { 4 } else { 2 };
+    clickable(&tile, || ui::launch(&["gtk-launch", "io.github.design_nexus.nyx.Calendar.desktop"]));
+    let t = tile.clone();
+    bind(&tile, calendar::live(), move |st| {
+        while let Some(c) = list.first_child() {
+            list.remove(&c);
+        }
+        let now = glib::real_time() / 1_000_000;
+        if !st.available || st.events.is_empty() {
+            list.append(&label(
+                if st.available { "Nothing coming up" } else { "Open Calendar once to see events here" },
+                "cc-status",
+            ));
+            t.set_tooltip_text(Some("Open Calendar"));
+            return;
+        }
+        for e in st.events.iter().take(rows) {
+            let r = gtk::Box::new(gtk::Orientation::Horizontal, 8);
+            r.add_css_class("cc-event");
+            let dot = gtk::Label::new(None);
+            dot.set_markup(&format!(
+                "<span foreground=\"{}\">●</span>",
+                glib::markup_escape_text(e.color.as_deref().unwrap_or("#888888"))
+            ));
+            r.append(&dot);
+            r.append(&label(&e.title, "cc-event-title"));
+            let when = gtk::Label::new(Some(&event_when(e, now)));
+            when.add_css_class("cc-event-when");
+            r.append(&when);
+            r.set_tooltip_text(Some(&if e.location.is_empty() {
+                format!("{} ({})", e.title, e.calendar)
+            } else {
+                format!("{} at {} ({})", e.title, e.location, e.calendar)
+            }));
+            list.append(&r);
+        }
+        t.set_tooltip_text(Some("Open Calendar"));
+    });
+    tile.upcast()
+}
+
 /// Power mode: just its three icons.
 fn power_tile(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     use power::Profile as P;
@@ -725,7 +821,7 @@ fn power_tile(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     tile.upcast()
 }
 
-fn battery(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
+fn battery(ctx: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     let tile = frame(size);
     tile.add_css_class("cc-battery");
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
@@ -738,7 +834,8 @@ fn battery(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     row.append(&img);
     row.append(&pct);
     tile.append(&row);
-    clickable(&tile, || ui::open_settings("power"));
+    let o = ctx.open.clone();
+    clickable(&tile, move || o(Detail::Battery));
     let t = tile.clone();
     bind(&tile, power::live(), move |st| {
         let Some(b) = &st.battery else {
@@ -764,7 +861,7 @@ fn battery(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
             (false, _, Some(time)) => format!("{} left", power::duration(time)),
             (false, _, None) => "on battery".to_string(),
         };
-        t.set_tooltip_text(Some(&format!("Battery {}%, {state}. Click for power settings", b.percent.round())));
+        t.set_tooltip_text(Some(&format!("Battery {}%, {state}. Click for details", b.percent.round())));
     });
     tile.upcast()
 }

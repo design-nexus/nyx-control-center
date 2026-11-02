@@ -93,10 +93,32 @@ pub fn tailscale_view(back: Rc<dyn Fn()>) -> gtk::Widget {
     let (h, sw) = head("Tailscale", back);
     root.append(&h);
     let quiet = guarded_switch(&sw, |on| act(tailscale::set_up(on)));
+    // Built once (a redraw mid-typing would drop it): filters the machines.
+    let search = gtk::SearchEntry::new();
+    search.set_placeholder_text(Some("Find a machine"));
+    search.add_css_class("cc-search");
+    root.append(&search);
     let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
     root.append(&scrolled(&body));
-    let b = body.clone();
-    bind(&root, tailscale::live(), move |st| {
+    // The exit-node country whose cities are open.
+    let open_country: Rc<RefCell<Option<String>>> = Rc::default();
+    type Draw = Rc<dyn Fn(&tailscale::State)>;
+    let slot: Rc<RefCell<Option<Draw>>> = Rc::default();
+    let redraw = {
+        let slot = slot.clone();
+        move || {
+            let d = slot.borrow().clone();
+            if let Some(d) = d {
+                d(&tailscale::live().get());
+            }
+        }
+    };
+    let rd = redraw.clone();
+    search.connect_search_changed(move |_| rd());
+    let (b, q, oc) = (body.clone(), search.clone(), open_country.clone());
+    let draw: Draw = Rc::new(move |st: &tailscale::State| {
+        let sw = sw.clone();
+        let quiet = quiet.clone();
         show_switch(&sw, &quiet, st.running());
         sw.set_sensitive(st.installed);
         clear(&b);
@@ -142,20 +164,56 @@ pub fn tailscale_view(back: Rc<dyn Fn()>) -> gtk::Widget {
             || act(tailscale::set_exit(None)),
         ));
         // Located ones (Mullvad) once per country, the best-placed first; others by name.
-        let mut seen_countries: Vec<String> = Vec::new();
-        for x in exits.iter().filter(|x| x.online || x.exit_active) {
-            if let Some(country) = &x.country {
-                if seen_countries.contains(country) && !x.exit_active {
-                    continue;
-                }
-                seen_countries.push(country.clone());
-            }
-            let title = x.location.clone().unwrap_or_else(|| x.name.clone());
+        let pick = |x: &tailscale::Machine| {
             let ip = x.ips.first().cloned().unwrap_or_default();
-            c.append(&choice_row("network-vpn-symbolic", &title, Some(&x.name), x.exit_active, move || {
+            move || {
                 let ip = ip.clone();
                 act(async move { tailscale::set_exit(Some(&ip)).await });
-            }));
+            }
+        };
+        // Your own exit nodes by name; located ones (Mullvad) by country, opening to cities.
+        for x in exits.iter().filter(|x| x.country.is_none() && (x.online || x.exit_active)) {
+            c.append(&choice_row("computer-symbolic", &x.name, Some("Your exit node"), x.exit_active, pick(x)));
+        }
+        let mut countries: Vec<String> = exits.iter().filter_map(|x| x.country.clone()).collect();
+        countries.sort();
+        countries.dedup();
+        for country in countries {
+            let here: Vec<&&tailscale::Machine> =
+                exits.iter().filter(|x| x.country.as_ref() == Some(&country) && x.online).collect();
+            let active = exits.iter().any(|x| x.country.as_ref() == Some(&country) && x.exit_active);
+            let open = oc.borrow().as_deref() == Some(country.as_str());
+            let r = row("mark-location-symbolic", &country, Some(&format!("{} servers", here.len())));
+            set_class(&r, "selected", active);
+            r.append(&icon(if open { "pan-up-symbolic" } else { "pan-down-symbolic" }, 14));
+            let (oc2, rd2, cc) = (oc.clone(), redraw.clone(), country.clone());
+            on_click(&r, move || {
+                let mut o = oc2.borrow_mut();
+                *o = if o.as_deref() == Some(cc.as_str()) { None } else { Some(cc.clone()) };
+                drop(o);
+                rd2();
+            });
+            c.append(&r);
+            if open {
+                // One server per city: the first online one.
+                let mut cities: Vec<String> = Vec::new();
+                for x in &here {
+                    let city = x.location.clone().unwrap_or_default();
+                    if cities.contains(&city) {
+                        continue;
+                    }
+                    cities.push(city.clone());
+                    let r = choice_row(
+                        "mark-location-symbolic",
+                        city.split(", ").nth(1).unwrap_or(&city),
+                        Some(&x.name),
+                        x.exit_active,
+                        pick(x),
+                    );
+                    r.add_css_class("cc-indent");
+                    c.append(&r);
+                }
+            }
         }
         if exits.is_empty() {
             c.append(&row("dialog-information-symbolic", "No exit nodes in this tailnet", None));
@@ -165,7 +223,13 @@ pub fn tailscale_view(back: Rc<dyn Fn()>) -> gtk::Widget {
         // Machines.
         b.append(&group("Machines"));
         let c = card();
-        for p in st.peers.iter().filter(|p| !p.exit_option || !p.location.is_some()) {
+        let query = q.text().to_lowercase();
+        for p in st.peers.iter().filter(|p| !p.exit_option || p.location.is_none()).filter(|p| {
+            query.is_empty()
+                || p.name.to_lowercase().contains(&query)
+                || p.dns.contains(&query)
+                || p.ips.iter().any(|i| i.contains(&query))
+        }) {
             let icon_name = match p.os.as_str() {
                 "iOS" | "android" => "phone-symbolic",
                 _ => "computer-symbolic",
@@ -200,6 +264,8 @@ pub fn tailscale_view(back: Rc<dyn Fn()>) -> gtk::Widget {
             b.append(&c);
         }
     });
+    *slot.borrow_mut() = Some(draw.clone());
+    bind(&root, tailscale::live(), move |st| draw(st));
     root.upcast()
 }
 
@@ -207,6 +273,8 @@ pub fn tailscale_view(back: Rc<dyn Fn()>) -> gtk::Widget {
 
 /// NordVPN's switches, as `(name, on)`.
 type NordSettings = Vec<(String, bool)>;
+/// Tor's exit countries, as `(code, relays)`.
+type ExitCountries = Vec<(String, usize)>;
 
 fn route_icon(r: Route) -> &'static str {
     match r {
@@ -308,10 +376,26 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
     let countries: Rc<RefCell<Option<Vec<String>>>> = Rc::default();
     let settings: Rc<RefCell<Option<NordSettings>>> = Rc::default();
     let show_countries = Rc::new(std::cell::Cell::new(false));
+    let open_country: Rc<RefCell<Option<String>>> = Rc::default();
+    let cities: Rc<RefCell<std::collections::HashMap<String, Vec<String>>>> = Rc::default();
+    let technology: Rc<RefCell<Option<String>>> = Rc::default();
+    let tor_exits: Rc<RefCell<Option<ExitCountries>>> = Rc::default();
+    let show_exits = Rc::new(std::cell::Cell::new(false));
+    let latency: Rc<RefCell<Option<String>>> = Rc::default();
+    let bridges: Rc<RefCell<Option<(bool, bool)>>> = Rc::default();
     type Draw = Rc<dyn Fn()>;
     let slot: Rc<RefCell<Option<Draw>>> = Rc::default();
     let b = body.clone();
     let (cs, ss, sc, sl) = (countries.clone(), settings.clone(), show_countries.clone(), slot.clone());
+    let (oc, ci, tech, tx, sx, lat, br) = (
+        open_country.clone(),
+        cities.clone(),
+        technology.clone(),
+        tor_exits.clone(),
+        show_exits.clone(),
+        latency.clone(),
+        bridges.clone(),
+    );
     let draw: Draw = Rc::new(move || {
         let st = routes::live().get();
         let net = network::live().get();
@@ -410,11 +494,50 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
                             let shown = country.replace('_', " ");
                             let current = st.nord.connected() && st.nord.country == shown;
                             let (cc, sc3) = (country.clone(), sc.clone());
-                            list.append(&choice_row("mark-location-symbolic", &shown, None, current, move || {
+                            let r = choice_row("mark-location-symbolic", &shown, None, current, move || {
                                 sc3.set(false);
                                 let cc = cc.clone();
                                 act(async move { routes::nord(Some(&cc)).await });
-                            }));
+                            });
+                            let open = oc.borrow().as_deref() == Some(country.as_str());
+                            let (oc2, ci2, rd2, cc2) = (oc.clone(), ci.clone(), redraw.clone(), country.clone());
+                            r.append(&row_button(
+                                if open { "pan-up-symbolic" } else { "pan-down-symbolic" },
+                                &format!("Cities in {shown}"),
+                                move || {
+                                    let now_open = oc2.borrow().as_deref() == Some(cc2.as_str());
+                                    *oc2.borrow_mut() = if now_open { None } else { Some(cc2.clone()) };
+                                    if !now_open && !ci2.borrow().contains_key(&cc2) {
+                                        let (ci3, rd3, cc3) = (ci2.clone(), rd2.clone(), cc2.clone());
+                                        glib::MainContext::default().spawn_local(async move {
+                                            let list = routes::nord_cities(&cc3).await;
+                                            ci3.borrow_mut().insert(cc3, list);
+                                            rd3();
+                                        });
+                                    }
+                                    rd2();
+                                },
+                            ));
+                            list.append(&r);
+                            if open {
+                                match ci.borrow().get(country) {
+                                    None => list.append(&label("Loading…", "cc-row-sub")),
+                                    Some(cs) => {
+                                        for city in cs {
+                                            let name = city.replace('_', " ");
+                                            let here = current && st.nord.city == name;
+                                            let (city, sc3) = (city.clone(), sc.clone());
+                                            let r = choice_row("mark-location-symbolic", &name, None, here, move || {
+                                                sc3.set(false);
+                                                let c = city.clone();
+                                                act(async move { routes::nord(Some(&c)).await });
+                                            });
+                                            r.add_css_class("cc-indent");
+                                            list.append(&r);
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -459,6 +582,51 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
                 r.append(&s);
                 c.append(&r);
             }
+            // Pause (it comes back by itself), and the technology.
+            if st.nord.connected() {
+                let r = row("media-playback-pause-symbolic", "Pause", Some("Reconnects by itself afterwards"));
+                let seg = gtk::Box::new(gtk::Orientation::Horizontal, 2);
+                seg.add_css_class("cc-segmented");
+                seg.add_css_class("cc-small-choice");
+                for d in ["5m", "15m", "1h", "24h"] {
+                    let b = gtk::Button::with_label(d);
+                    b.set_tooltip_text(Some(&format!("Pause NordVPN for {d}")));
+                    b.connect_clicked(move |_| act(routes::nord_pause(d)));
+                    seg.append(&b);
+                }
+                seg.set_valign(gtk::Align::Center);
+                r.append(&seg);
+                c.append(&r);
+            }
+            if tech.borrow().is_none() {
+                *tech.borrow_mut() = Some(String::new());
+                let (t2, rd2) = (tech.clone(), redraw.clone());
+                glib::MainContext::default().spawn_local(async move {
+                    *t2.borrow_mut() = Some(routes::nord_technology().await.unwrap_or_default());
+                    rd2();
+                });
+            }
+            let current = tech.borrow().clone().unwrap_or_default();
+            if !current.is_empty() {
+                let r = row("network-vpn-symbolic", "Technology", Some("NordLynx is the fastest"));
+                let seg = gtk::Box::new(gtk::Orientation::Horizontal, 2);
+                seg.add_css_class("cc-segmented");
+                seg.add_css_class("cc-small-choice");
+                for (id, name) in [("NORDLYNX", "NordLynx"), ("OPENVPN", "OpenVPN"), ("NORDWHISPER", "NordWhisper")] {
+                    let b = gtk::ToggleButton::with_label(name);
+                    b.set_active(current == id);
+                    let (t2, rd2) = (tech.clone(), redraw.clone());
+                    b.connect_clicked(move |_| {
+                        *t2.borrow_mut() = Some(id.to_string());
+                        act(routes::nord_set_value("technology", id));
+                        rd2();
+                    });
+                    seg.append(&b);
+                }
+                seg.set_valign(gtk::Align::Center);
+                r.append(&seg);
+                c.append(&r);
+            }
             b.append(&c);
         }
 
@@ -487,6 +655,107 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
                     act(routes::tor_new_circuit())
                 }));
                 r.append(&row_button("edit-clear-symbolic", "Let Tor choose the exit country", || act(routes::tor_exit("auto"))));
+                c.append(&r);
+                // Exit country (a slow list to build: on demand).
+                let r = row("mark-location-symbolic", "Exit country", Some("Pick where your traffic leaves Tor"));
+                let (sx2, tx2, rd2) = (sx.clone(), tx.clone(), redraw.clone());
+                r.append(&row_button(
+                    if sx.get() { "pan-up-symbolic" } else { "pan-down-symbolic" },
+                    "Choose the exit country",
+                    move || {
+                        sx2.set(!sx2.get());
+                        if sx2.get() && tx2.borrow().is_none() {
+                            *tx2.borrow_mut() = Some(Vec::new());
+                            let (tx3, rd3) = (tx2.clone(), rd2.clone());
+                            glib::MainContext::default().spawn_local(async move {
+                                *tx3.borrow_mut() = Some(routes::tor_exit_countries().await);
+                                rd3();
+                            });
+                        }
+                        rd2();
+                    },
+                ));
+                c.append(&r);
+                if sx.get() {
+                    let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
+                    let exits = tx.borrow().clone().unwrap_or_default();
+                    if exits.is_empty() {
+                        list.append(&label("Asking Tor about its exits… (up to a minute)", "cc-row-sub"));
+                    }
+                    for (cc, n) in exits {
+                        let current = st.tor.requested_exit.eq_ignore_ascii_case(&cc);
+                        let code = cc.clone();
+                        list.append(&choice_row(
+                            "mark-location-symbolic",
+                            &cc.to_uppercase(),
+                            Some(&format!("{n} exit relays")),
+                            current,
+                            move || {
+                                let code = code.clone();
+                                act(async move { routes::tor_exit(&code).await });
+                            },
+                        ));
+                    }
+                    let s = gtk::ScrolledWindow::new();
+                    s.set_hscrollbar_policy(gtk::PolicyType::Never);
+                    s.set_min_content_height(180);
+                    s.set_max_content_height(180);
+                    s.set_child(Some(&list));
+                    c.append(&s);
+                }
+                // Latency through the circuit, measured on request.
+                let sub = lat.borrow().clone().unwrap_or_else(|| "Measure how slow the circuit is".into());
+                let r = row("network-transmit-receive-symbolic", "Latency", Some(&sub));
+                let (lat2, rd2) = (lat.clone(), redraw.clone());
+                r.append(&row_button("view-refresh-symbolic", "Measure the latency now", move || {
+                    *lat2.borrow_mut() = Some("Measuring…".into());
+                    rd2();
+                    let (lat3, rd3) = (lat2.clone(), rd2.clone());
+                    glib::MainContext::default().spawn_local(async move {
+                        *lat3.borrow_mut() = Some(
+                            routes::tor_latency()
+                                .await
+                                .map(|ms| format!("{ms:.0} ms"))
+                                .unwrap_or_else(|| "Couldn't measure".into()),
+                        );
+                        rd3();
+                    });
+                }));
+                c.append(&r);
+                let r = row("web-browser-symbolic", "Tor browser", Some("A browser that can reach nothing but Tor"));
+                r.append(&row_button("go-next-symbolic", "Open a Tor-only browser", routes::tor_browser));
+                c.append(&r);
+            }
+            // Bridges, for networks that block Tor.
+            if br.borrow().is_none() {
+                *br.borrow_mut() = Some((false, false));
+                let (br2, rd2) = (br.clone(), redraw.clone());
+                glib::MainContext::default().spawn_local(async move {
+                    *br2.borrow_mut() = Some(routes::tor_bridges().await.unwrap_or((false, false)));
+                    rd2();
+                });
+            }
+            let (on, configured) = br.borrow().unwrap_or((false, false));
+            let r = row(
+                "network-wired-symbolic",
+                "Bridges",
+                Some(if configured { "For networks that block Tor" } else { "None set up (tormarchy bridge set)" }),
+            );
+            let s = gtk::Switch::new();
+            s.set_valign(gtk::Align::Center);
+            s.set_active(on);
+            s.set_sensitive(configured);
+            let br2 = br.clone();
+            s.connect_state_set(move |_, v| {
+                *br2.borrow_mut() = Some((v, true));
+                act(routes::tor_set_bridges(v));
+                glib::Propagation::Proceed
+            });
+            r.append(&s);
+            c.append(&r);
+            if st.tor.running {
+                let r = row("dialog-warning-symbolic", "Panic", Some("Stuck offline? Remove every Tor rule now"));
+                r.append(&row_button("process-stop-symbolic", "Remove every Tor firewall rule now", || act(routes::tor_panic())));
                 c.append(&r);
             }
             b.append(&c);

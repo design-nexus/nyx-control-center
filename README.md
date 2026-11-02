@@ -36,22 +36,31 @@ Two bar widgets are installed; add them from Settings → Plugins (or
 - **Wi-Fi, Bluetooth**: the tile switches it on or off; the arrow opens the full list in
   the panel: join networks (the password typed in place), metered connection, the DNS
   provider (Cloudflare, Google, the network's own, or your own), the Wi-Fi band, a
-  network's sign-in page, a speed test and a QR code to share the network; connect or
-  disconnect paired devices.
+  network's sign-in page, the connection (address, router, ping, throughput, signal), a
+  speed test and a QR code to share the network; connect, disconnect, forget and pair
+  Bluetooth devices.
 - **VPN**: where traffic goes, directly, through NordVPN or through Tor, only one at a
-  time; NordVPN's country and settings (kill switch, auto-connect); Tor's mode, exit and
-  a new circuit; and NetworkManager's own VPN connections.
+  time; NordVPN's country and city, pause, technology and settings (kill switch,
+  auto-connect); Tor's mode, exit country, a new circuit, latency, bridges, a Tor-only
+  browser and panic; and NetworkManager's own VPN connections.
 - **Tailscale**: on or off; this machine's address and name to copy; the tailnet's
-  machines (copy an address or name, send files); the exit node; accounts.
-- **Sound and brightness** sliders. The speaker button opens outputs and each app's
-  volume; the output button mutes. Brightness is the focused screen's: the laptop's
-  backlight, or an external monitor over DDC, as Omarchy's brightness keys do.
+  machines, searchable (copy an address or name, send files); the exit node, Mullvad's
+  by country and city; accounts.
+- **Sound and brightness** sliders. The speaker button opens outputs, each app's volume
+  and the microphone (level, mute, which input, which apps are recording); the output
+  button mutes. Brightness is the focused screen's: the laptop's backlight, or an
+  external monitor over DDC, as Omarchy's brightness keys do. The screen button opens
+  **Screens**: each screen's brightness, the scale, the text size everywhere, and the
+  laptop's own screen on or off while another is plugged in.
+- **Microphone**: mute it; red while an app is recording.
+- **Up next**: the coming events from Nyx Calendar; click to open Calendar.
 - **Home**: a room's lights and devices from Nyx Home (pick the room from the tile's
   header), with its scenes. Click to switch a device; right-click a light for brightness
   and colour. Home's service (`nyx-homed`) does the talking to Home Assistant, so Home
   needn't be open.
 - **Now playing** from any player (Nyx Music, browsers, …) with its controls.
-- **Power mode** (power saver, balanced, performance) and the battery.
+- **Power mode** (power saver, balanced, performance) and the battery; the battery
+  opens its details: power draw, capacity, charge cycles and the charge limit.
 - **Omarchy's switches**: Do not disturb, Night light, Keep awake, the workspace's mode
   (tiling, scrolling, floating; a click goes to the next), keyboard light, and a
   screenshot.
@@ -94,9 +103,10 @@ sizes they come in:
 | `sound` (volume and brightness) | 4x2, 2x2 |
 | `home` | 2x3, 4x3 |
 | `media` | 4x2 |
+| `upcoming` (Up next) | 4x2, 2x2, 4x3 |
 | `power` | 2x1, 4x1 |
 | `battery` | 1x1, 2x1 |
-| `dnd`, `mode`, `night-light`, `keep-awake`, `keyboard-light`, `capture` | 1x1 |
+| `dnd`, `mode`, `night-light`, `keep-awake`, `keyboard-light`, `microphone`, `capture` | 1x1 |
 
 ## Build
 

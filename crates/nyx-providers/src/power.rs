@@ -183,3 +183,73 @@ mod tests {
         }
     }
 }
+
+// ---------------------------------------------------------------- Battery details
+
+/// What Omarchy's power panel shows beyond the percentage (`omarchy-battery-status
+/// --shell`): power draw, capacity, charge cycles and the charge limit.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Details {
+    pub state: String,
+    /// "13.1W".
+    pub rate: String,
+    /// "87Wh".
+    pub size: String,
+    pub time: String,
+    pub cycles: Option<u32>,
+    /// "75-80%": charging stops in this range to spare the battery.
+    pub threshold: String,
+}
+
+/// `key<TAB>value` lines.
+pub fn parse_details(text: &str) -> Details {
+    let mut d = Details::default();
+    for line in text.lines() {
+        let Some((k, v)) = line.split_once('\t') else { continue };
+        let v = v.trim().to_string();
+        match k {
+            "state" => d.state = v,
+            "rate" => d.rate = v,
+            "size" => d.size = v,
+            "time" => d.time = v,
+            "cycles" => d.cycles = v.parse().ok().filter(|c| *c > 0),
+            "threshold" => d.threshold = v,
+            _ => {}
+        }
+    }
+    d
+}
+
+thread_local! {
+    static DETAILS: Live<Option<Details>> = Live::new(None, start_details);
+}
+
+pub fn details() -> Live<Option<Details>> {
+    DETAILS.with(|l| l.clone())
+}
+
+fn start_details(set: Setter<Option<Details>>) -> Box<dyn Stop> {
+    read_details(set.clone());
+    let id = glib::timeout_add_local(std::time::Duration::from_secs(5), move || {
+        read_details(set.clone());
+        glib::ControlFlow::Continue
+    });
+    Box::new(crate::TimerStop(Some(id)))
+}
+
+fn read_details(set: Setter<Option<Details>>) {
+    glib::MainContext::default().spawn_local(async move {
+        set.set(crate::output(&["omarchy-battery-status", "--shell"]).await.map(|t| parse_details(&t)));
+    });
+}
+
+#[cfg(test)]
+mod detail_tests {
+    #[test]
+    fn reads_details() {
+        let d = super::parse_details(
+            "percentage\t100%\nstate\tfully-charged\nrate\t0W\nsize\t87Wh\ntime\t\ncycles\t0\nthreshold\t75-80%\n",
+        );
+        assert_eq!((d.size.as_str(), d.threshold.as_str(), d.cycles), ("87Wh", "75-80%", None));
+    }
+}
