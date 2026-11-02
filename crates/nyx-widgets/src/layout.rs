@@ -29,6 +29,8 @@ impl Size {
     pub const S2X2: Size = Size { cols: 2, rows: 2 };
     pub const S4X1: Size = Size { cols: 4, rows: 1 };
     pub const S4X2: Size = Size { cols: 4, rows: 2 };
+    pub const S2X3: Size = Size { cols: 2, rows: 3 };
+    pub const S4X3: Size = Size { cols: 4, rows: 3 };
 
     pub fn parse(s: &str) -> Option<Size> {
         let (c, r) = s.split_once('x')?;

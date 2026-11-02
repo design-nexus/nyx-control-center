@@ -26,6 +26,30 @@ pub struct Config {
     /// Open on the page shown last (else always the first).
     #[serde(default = "yes")]
     pub remember_page: bool,
+    /// Which layout format the file was written in (missing: the first).
+    #[serde(default)]
+    pub version: u32,
+}
+
+const LAYOUT_VERSION: u32 = 2;
+
+/// Bring an older layout up to date. Version 2: the old `vpn` tile showed Tailscale, so
+/// it becomes `tailscale`, and the new `vpn` tile (NordVPN, Tor) goes beside it.
+pub fn migrate(c: &mut Config) -> bool {
+    if c.version >= LAYOUT_VERSION {
+        return false;
+    }
+    if c.version < 2 {
+        for page in &mut c.pages {
+            if let Some(i) = page.tiles.iter().position(|t| t.widget == "vpn") {
+                page.tiles[i].widget = "tailscale".into();
+                let size = page.tiles[i].size;
+                page.tiles.insert(i, layout::Tile::new("vpn", size));
+            }
+        }
+    }
+    c.version = LAYOUT_VERSION;
+    true
 }
 
 fn yes() -> bool {
@@ -39,13 +63,18 @@ pub fn config_path() -> PathBuf {
 pub fn load_config() -> Config {
     let path = config_path();
     match std::fs::read_to_string(&path).map(|t| toml::from_str::<Config>(&t)) {
-        Ok(Ok(c)) if !c.pages.is_empty() => c,
+        Ok(Ok(mut c)) if !c.pages.is_empty() => {
+            if migrate(&mut c) {
+                let _ = std::fs::write(&path, toml::to_string_pretty(&c).unwrap_or_default());
+            }
+            c
+        }
         Ok(Err(e)) => {
             eprintln!("nyx-control-center: {}: {e}; using the default layout", path.display());
-            Config { pages: tiles::default_pages(), remember_page: true }
+            Config { pages: tiles::default_pages(), remember_page: true, version: LAYOUT_VERSION }
         }
         _ => {
-            let c = Config { pages: tiles::default_pages(), remember_page: true };
+            let c = Config { pages: tiles::default_pages(), remember_page: true, version: LAYOUT_VERSION };
             if let Some(dir) = path.parent() {
                 let _ = std::fs::create_dir_all(dir);
             }
@@ -759,8 +788,8 @@ fn page_grid(ctx: &Ctx, page: &Page, page_index: usize, editing: bool, panel: st
     grid.add_css_class("cc-grid");
     grid.set_column_homogeneous(true);
     grid.set_row_homogeneous(true);
-    grid.set_column_spacing(10);
-    grid.set_row_spacing(10);
+    grid.set_column_spacing(8);
+    grid.set_row_spacing(8);
     grid.set_valign(gtk::Align::Start);
     // Unknown widgets (from a newer version, or a typo) are skipped, not fatal.
     let known: Vec<(usize, &layout::Tile, tiles::Kind)> =

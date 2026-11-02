@@ -12,12 +12,13 @@ pub fn view(which: Detail, back: Rc<dyn Fn()>) -> gtk::Widget {
     match which {
         Detail::Wifi => wifi(back),
         Detail::Bluetooth => bluetooth_view(back),
-        Detail::Vpn => vpn(back),
+        Detail::Vpn => crate::route_tiles::vpn_view(back),
+        Detail::Tailscale => crate::route_tiles::tailscale_view(back),
     }
 }
 
 /// Back, title, and the feature's switch.
-fn head(title: &str, back: Rc<dyn Fn()>) -> (gtk::Box, gtk::Switch) {
+pub fn head(title: &str, back: Rc<dyn Fn()>) -> (gtk::Box, gtk::Switch) {
     let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
     row.add_css_class("cc-detail-head");
     let b = icon_button("go-previous-symbolic", "Back (Esc)");
@@ -32,20 +33,20 @@ fn head(title: &str, back: Rc<dyn Fn()>) -> (gtk::Box, gtk::Switch) {
     (row, sw)
 }
 
-fn group(title: &str) -> gtk::Label {
+pub fn group(title: &str) -> gtk::Label {
     let l = gtk::Label::new(Some(&title.to_uppercase()));
     l.add_css_class("cc-group");
     l.set_xalign(0.0);
     l
 }
 
-fn card() -> gtk::Box {
+pub fn card() -> gtk::Box {
     let c = gtk::Box::new(gtk::Orientation::Vertical, 0);
     c.add_css_class("cc-card");
     c
 }
 
-fn row(icon_name: &str, title: &str, sub: Option<&str>) -> gtk::Box {
+pub fn row(icon_name: &str, title: &str, sub: Option<&str>) -> gtk::Box {
     let r = gtk::Box::new(gtk::Orientation::Horizontal, 10);
     r.add_css_class("cc-row");
     r.append(&icon(icon_name, 16));
@@ -60,14 +61,14 @@ fn row(icon_name: &str, title: &str, sub: Option<&str>) -> gtk::Box {
     r
 }
 
-fn on_click(w: &impl IsA<gtk::Widget>, f: impl Fn() + 'static) {
+pub fn on_click(w: &impl IsA<gtk::Widget>, f: impl Fn() + 'static) {
     let c = gtk::GestureClick::new();
     c.connect_released(move |_, _, _, _| f());
     w.add_controller(c);
     w.add_css_class("cc-clickable");
 }
 
-fn scrolled(child: &impl IsA<gtk::Widget>) -> gtk::ScrolledWindow {
+pub fn scrolled(child: &impl IsA<gtk::Widget>) -> gtk::ScrolledWindow {
     let s = gtk::ScrolledWindow::new();
     s.set_hscrollbar_policy(gtk::PolicyType::Never);
     s.set_vexpand(true);
@@ -76,7 +77,7 @@ fn scrolled(child: &impl IsA<gtk::Widget>) -> gtk::ScrolledWindow {
     s
 }
 
-fn foot(buttons: &[gtk::Button]) -> gtk::Box {
+pub fn foot(buttons: &[gtk::Button]) -> gtk::Box {
     let f = gtk::Box::new(gtk::Orientation::Horizontal, 2);
     f.add_css_class("cc-detail-foot");
     f.set_halign(gtk::Align::End);
@@ -86,14 +87,14 @@ fn foot(buttons: &[gtk::Button]) -> gtk::Box {
     f
 }
 
-fn clear(b: &gtk::Box) {
+pub fn clear(b: &gtk::Box) {
     while let Some(c) = b.first_child() {
         b.remove(&c);
     }
 }
 
 /// A switch that reports user flips only (not the ones made to show the state).
-fn guarded_switch(sw: &gtk::Switch, f: impl Fn(bool) + 'static) -> Rc<std::cell::Cell<bool>> {
+pub fn guarded_switch(sw: &gtk::Switch, f: impl Fn(bool) + 'static) -> Rc<std::cell::Cell<bool>> {
     let quiet = Rc::new(std::cell::Cell::new(false));
     let q = quiet.clone();
     sw.connect_state_set(move |_, on| {
@@ -105,7 +106,7 @@ fn guarded_switch(sw: &gtk::Switch, f: impl Fn(bool) + 'static) -> Rc<std::cell:
     quiet
 }
 
-fn show_switch(sw: &gtk::Switch, quiet: &std::cell::Cell<bool>, on: bool) {
+pub fn show_switch(sw: &gtk::Switch, quiet: &std::cell::Cell<bool>, on: bool) {
     quiet.set(true);
     sw.set_active(on);
     quiet.set(false);
@@ -128,13 +129,23 @@ fn wifi(back: Rc<dyn Fn()>) -> gtk::Widget {
     let (h, sw) = head("Wi-Fi", back);
     root.append(&h);
     let quiet = guarded_switch(&sw, |on| act(network::set_wifi(on)));
+    let outer = gtk::Box::new(gtk::Orientation::Vertical, 0);
     let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    root.append(&scrolled(&body));
-    let rescan = icon_button("view-refresh-symbolic", "Look for networks");
+    let extras = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    outer.append(&body);
+    outer.append(&extras);
+    root.append(&scrolled(&outer));
+    let rescan = icon_button("view-refresh-symbolic", "Look for networks again");
     rescan.connect_clicked(|_| act(network::rescan()));
+    let speed = icon_button("speedometer-symbolic", "Speed test: measure download and upload");
+    speed.connect_clicked(|_| nyx_providers::dns::speed_test());
+    let qr = icon_button("qr-code-symbolic", "Share this network: a QR code a phone can scan to join");
+    qr.connect_clicked(|_| nyx_providers::dns::share_qr());
     let settings = icon_button("emblem-system-symbolic", "Wi-Fi settings");
     settings.connect_clicked(|_| ui::open_settings("wifi"));
-    root.append(&foot(&[rescan, settings]));
+    root.append(&foot(&[rescan, speed, qr, settings]));
+    let e = extras.clone();
+    bind(&root, nyx_providers::dns::live(), move |st| wifi_extras(&e, st));
 
     // The network whose password is being typed. While it's set, system updates don't
     // redraw the list (a scan would rebuild the field and lose what's typed).
@@ -204,6 +215,60 @@ fn wifi(back: Rc<dyn Fn()>) -> gtk::Widget {
         }
     });
     root.upcast()
+}
+
+/// DNS provider, Wi-Fi band and a sign-in page: Omarchy's network panel's extras.
+fn wifi_extras(b: &gtk::Box, st: &nyx_providers::dns::State) {
+    use nyx_providers::dns;
+    clear(b);
+    if st.portal {
+        let c = card();
+        let r = row("dialog-password-symbolic", "This network wants you to sign in", Some("Opens its sign-in page"));
+        on_click(&r, dns::sign_in);
+        c.append(&r);
+        b.append(&c);
+    }
+    if !st.dns.is_empty() {
+        b.append(&group("DNS"));
+        let c = card();
+        for (id, name, desc) in dns::PROVIDERS {
+            let current = st.dns == *id;
+            let r = row("network-server-symbolic", name, Some(desc));
+            set_class(&r, "selected", current);
+            if current {
+                r.append(&icon("object-select-symbolic", 14));
+            }
+            let id = id.to_string();
+            on_click(&r, move || {
+                let id = id.clone();
+                act(async move { dns::set_dns(&id).await });
+            });
+            c.append(&r);
+        }
+        b.append(&c);
+    }
+    if let Some(band) = &st.band
+        && (band.available.len() > 1 || band.selected != "auto")
+    {
+        b.append(&group("Band"));
+        let c = card();
+        let mut options = vec![("auto".to_string(), format!("Automatic (now {} GHz)", band.current))];
+        options.extend(band.available.iter().map(|a| (a.clone(), format!("{a} GHz only"))));
+        for (id, text) in options {
+            let current = band.selected == id;
+            let r = row("network-wireless-symbolic", &text, None);
+            set_class(&r, "selected", current);
+            if current {
+                r.append(&icon("object-select-symbolic", 14));
+            }
+            on_click(&r, move || {
+                let id = id.clone();
+                act(async move { dns::set_band(&id).await });
+            });
+            c.append(&r);
+        }
+        b.append(&c);
+    }
 }
 
 fn current_card(cur: &network::Network, st: &network::State) -> gtk::Box {
@@ -353,47 +418,6 @@ fn bluetooth_view(back: Rc<dyn Fn()>) -> gtk::Widget {
 }
 
 // ---------- VPN ----------
-
-fn vpn(back: Rc<dyn Fn()>) -> gtk::Widget {
-    let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    root.add_css_class("cc-detail");
-    let (h, sw) = head("VPN", back);
-    sw.set_visible(false);
-    root.append(&h);
-    let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    root.append(&scrolled(&body));
-    let settings = icon_button("emblem-system-symbolic", "Network settings");
-    settings.connect_clicked(|_| ui::open_settings("network"));
-    root.append(&foot(&[settings]));
-    let b = body.clone();
-    bind(&root, network::live(), move |st| {
-        clear(&b);
-        if st.vpns.is_empty() {
-            let l = label("No VPNs set up", "cc-empty");
-            l.set_xalign(0.5);
-            b.append(&l);
-            return;
-        }
-        let c = card();
-        for v in &st.vpns {
-            let r = row("network-vpn-symbolic", &v.name, Some(if v.active { "Connected" } else { "Off" }));
-            set_class(&r, "selected", v.active);
-            let s = gtk::Switch::new();
-            s.set_valign(gtk::Align::Center);
-            s.set_active(v.active);
-            let vv = v.clone();
-            s.connect_state_set(move |_, on| {
-                let v = vv.clone();
-                act(async move { network::set_vpn(&v, on).await });
-                glib::Propagation::Proceed
-            });
-            r.append(&s);
-            c.append(&r);
-        }
-        b.append(&c);
-    });
-    root.upcast()
-}
 
 // ---------- Volume popover ----------
 

@@ -66,18 +66,28 @@ window.nyx-control-center button.cc-icon-button.on {
 
 /* ---------- Tiles ---------- */
 
+/* One grid row is 48 px: a 1×1 toggle is just its icon, a 2×1 tile a slim bar. */
 window.nyx-control-center .cc-tile {
   background: @theme_card;
   border-radius: 11px;
-  min-height: 82px;
+  min-height: 48px;
   transition: background 120ms ease-out;
 }
 
-window.nyx-control-center .cc-toggle,
-window.nyx-control-center .cc-sliders,
-window.nyx-control-center .cc-media,
+window.nyx-control-center .cc-toggle {
+  padding: 0 8px;
+}
+
+window.nyx-control-center .cc-sliders {
+  padding: 4px 6px;
+}
+
+window.nyx-control-center .cc-media {
+  padding: 12px 14px;
+}
+
 window.nyx-control-center .cc-power {
-  padding: 10px 10px 9px;
+  padding: 5px;
 }
 
 window.nyx-control-center .cc-clickable:hover {
@@ -89,8 +99,8 @@ window.nyx-control-center .cc-tile.cc-clickable:hover {
 }
 
 window.nyx-control-center .cc-chip {
-  min-width: 32px;
-  min-height: 32px;
+  min-width: 30px;
+  min-height: 30px;
   border-radius: 7px;
   background: alpha(@theme_text, 0.1);
   color: @theme_text;
@@ -102,16 +112,12 @@ window.nyx-control-center .cc-chip.on {
 }
 
 window.nyx-control-center .cc-title {
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
 }
 
-window.nyx-control-center .cc-1x1 .cc-title {
-  font-size: 12px;
-}
-
 window.nyx-control-center .cc-status {
-  font-size: 12px;
+  font-size: 11.5px;
   color: @theme_dim_text;
 }
 
@@ -125,12 +131,12 @@ window.nyx-control-center .cc-split.on {
 }
 
 window.nyx-control-center .cc-split-main {
-  padding: 0 0 0 12px;
+  padding: 0 0 0 9px;
   border-radius: 11px 0 0 11px;
 }
 
 window.nyx-control-center button.cc-split-more {
-  min-width: 34px;
+  min-width: 28px;
   padding: 0;
   border-radius: 0 11px 11px 0;
   border: none;
@@ -155,7 +161,7 @@ window.nyx-control-center .cc-sliders {
 }
 
 window.nyx-control-center .cc-slider {
-  min-height: 32px;
+  min-height: 30px;
 }
 
 window.nyx-control-center .cc-slider scale {
@@ -351,8 +357,15 @@ window.nyx-control-center .cc-app-volume {
   padding: 0 8px;
 }
 
+/* Tooltips: light text weight, a quieter colour. */
 tooltip {
   border-radius: 7px;
+}
+
+tooltip label {
+  font-weight: 400;
+  font-size: 12px;
+  color: @theme_dim_text;
 }
 
 /* ---------- Edit mode ---------- */
@@ -421,7 +434,7 @@ window.nyx-control-center button.cc-dot-add {
 }
 
 window.nyx-control-center .cc-empty-page {
-  min-height: 82px;
+  min-height: 48px;
   border: 1px dashed alpha(@theme_accent, 0.5);
   border-radius: 11px;
 }
@@ -510,4 +523,278 @@ window.nyx-control-center button.cc-swatch {
 .cc-light-popover {
   padding: 6px;
   min-width: 240px;
+}
+
+/* ---------- Colours: each kind of tile has its own (the theme's swatches) ---------- */
+
+window.nyx-control-center .tint-blue .cc-chip.on,
+window.nyx-control-center .cc-chip.on.tint-blue {
+  background: @cc_blue;
+  color: @theme_bg;
+}
+
+window.nyx-control-center .cc-split.on.tint-blue {
+  background: mix(@theme_card, @cc_blue, 0.13);
+}
+
+window.nyx-control-center .cc-split.on.tint-blue button.cc-split-more {
+  border-left-color: alpha(@cc_blue, 0.25);
+}
+
+window.nyx-control-center .cc-slider.tint-blue scale highlight {
+  background: @cc_blue;
+}
+
+window.nyx-control-center .cc-slider.tint-blue > button.cc-icon-button:first-child {
+  color: @cc_blue;
+}
+
+window.nyx-control-center .cc-segmented button.tint-blue:checked {
+  color: @cc_blue;
+}
+
+window.nyx-control-center .tint-violet .cc-chip.on,
+window.nyx-control-center .cc-chip.on.tint-violet {
+  background: @cc_violet;
+  color: @theme_bg;
+}
+
+window.nyx-control-center .cc-split.on.tint-violet {
+  background: mix(@theme_card, @cc_violet, 0.13);
+}
+
+window.nyx-control-center .cc-split.on.tint-violet button.cc-split-more {
+  border-left-color: alpha(@cc_violet, 0.25);
+}
+
+window.nyx-control-center .cc-slider.tint-violet scale highlight {
+  background: @cc_violet;
+}
+
+window.nyx-control-center .cc-slider.tint-violet > button.cc-icon-button:first-child {
+  color: @cc_violet;
+}
+
+window.nyx-control-center .cc-segmented button.tint-violet:checked {
+  color: @cc_violet;
+}
+
+window.nyx-control-center .tint-pink .cc-chip.on,
+window.nyx-control-center .cc-chip.on.tint-pink {
+  background: @cc_pink;
+  color: @theme_bg;
+}
+
+window.nyx-control-center .cc-split.on.tint-pink {
+  background: mix(@theme_card, @cc_pink, 0.13);
+}
+
+window.nyx-control-center .cc-split.on.tint-pink button.cc-split-more {
+  border-left-color: alpha(@cc_pink, 0.25);
+}
+
+window.nyx-control-center .cc-slider.tint-pink scale highlight {
+  background: @cc_pink;
+}
+
+window.nyx-control-center .cc-slider.tint-pink > button.cc-icon-button:first-child {
+  color: @cc_pink;
+}
+
+window.nyx-control-center .cc-segmented button.tint-pink:checked {
+  color: @cc_pink;
+}
+
+window.nyx-control-center .tint-red .cc-chip.on,
+window.nyx-control-center .cc-chip.on.tint-red {
+  background: @cc_red;
+  color: @theme_bg;
+}
+
+window.nyx-control-center .cc-split.on.tint-red {
+  background: mix(@theme_card, @cc_red, 0.13);
+}
+
+window.nyx-control-center .cc-split.on.tint-red button.cc-split-more {
+  border-left-color: alpha(@cc_red, 0.25);
+}
+
+window.nyx-control-center .cc-slider.tint-red scale highlight {
+  background: @cc_red;
+}
+
+window.nyx-control-center .cc-slider.tint-red > button.cc-icon-button:first-child {
+  color: @cc_red;
+}
+
+window.nyx-control-center .cc-segmented button.tint-red:checked {
+  color: @cc_red;
+}
+
+window.nyx-control-center .tint-coral .cc-chip.on,
+window.nyx-control-center .cc-chip.on.tint-coral {
+  background: @cc_coral;
+  color: @theme_bg;
+}
+
+window.nyx-control-center .cc-split.on.tint-coral {
+  background: mix(@theme_card, @cc_coral, 0.13);
+}
+
+window.nyx-control-center .cc-split.on.tint-coral button.cc-split-more {
+  border-left-color: alpha(@cc_coral, 0.25);
+}
+
+window.nyx-control-center .cc-slider.tint-coral scale highlight {
+  background: @cc_coral;
+}
+
+window.nyx-control-center .cc-slider.tint-coral > button.cc-icon-button:first-child {
+  color: @cc_coral;
+}
+
+window.nyx-control-center .cc-segmented button.tint-coral:checked {
+  color: @cc_coral;
+}
+
+window.nyx-control-center .tint-amber .cc-chip.on,
+window.nyx-control-center .cc-chip.on.tint-amber {
+  background: @cc_amber;
+  color: @theme_bg;
+}
+
+window.nyx-control-center .cc-split.on.tint-amber {
+  background: mix(@theme_card, @cc_amber, 0.13);
+}
+
+window.nyx-control-center .cc-split.on.tint-amber button.cc-split-more {
+  border-left-color: alpha(@cc_amber, 0.25);
+}
+
+window.nyx-control-center .cc-slider.tint-amber scale highlight {
+  background: @cc_amber;
+}
+
+window.nyx-control-center .cc-slider.tint-amber > button.cc-icon-button:first-child {
+  color: @cc_amber;
+}
+
+window.nyx-control-center .cc-segmented button.tint-amber:checked {
+  color: @cc_amber;
+}
+
+window.nyx-control-center .tint-green .cc-chip.on,
+window.nyx-control-center .cc-chip.on.tint-green {
+  background: @cc_green;
+  color: @theme_bg;
+}
+
+window.nyx-control-center .cc-split.on.tint-green {
+  background: mix(@theme_card, @cc_green, 0.13);
+}
+
+window.nyx-control-center .cc-split.on.tint-green button.cc-split-more {
+  border-left-color: alpha(@cc_green, 0.25);
+}
+
+window.nyx-control-center .cc-slider.tint-green scale highlight {
+  background: @cc_green;
+}
+
+window.nyx-control-center .cc-slider.tint-green > button.cc-icon-button:first-child {
+  color: @cc_green;
+}
+
+window.nyx-control-center .cc-segmented button.tint-green:checked {
+  color: @cc_green;
+}
+
+window.nyx-control-center .tint-teal .cc-chip.on,
+window.nyx-control-center .cc-chip.on.tint-teal {
+  background: @cc_teal;
+  color: @theme_bg;
+}
+
+window.nyx-control-center .cc-split.on.tint-teal {
+  background: mix(@theme_card, @cc_teal, 0.13);
+}
+
+window.nyx-control-center .cc-split.on.tint-teal button.cc-split-more {
+  border-left-color: alpha(@cc_teal, 0.25);
+}
+
+window.nyx-control-center .cc-slider.tint-teal scale highlight {
+  background: @cc_teal;
+}
+
+window.nyx-control-center .cc-slider.tint-teal > button.cc-icon-button:first-child {
+  color: @cc_teal;
+}
+
+window.nyx-control-center .cc-segmented button.tint-teal:checked {
+  color: @cc_teal;
+}
+
+/* Media: full width, cover art and big controls. */
+window.nyx-control-center .cc-media .cc-art {
+  border-radius: 9px;
+}
+
+window.nyx-control-center .cc-media-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+window.nyx-control-center .cc-media-player {
+  font-size: 11px;
+  color: @theme_text_tertiary;
+}
+
+window.nyx-control-center .cc-media .cc-media-buttons {
+  margin-top: 6px;
+}
+
+window.nyx-control-center .cc-media .cc-media-buttons button.cc-icon-button {
+  min-width: 32px;
+  min-height: 32px;
+}
+
+window.nyx-control-center .cc-media button.cc-play {
+  background: @cc_pink;
+  color: @theme_bg;
+  border-radius: 999px;
+}
+
+window.nyx-control-center .cc-media button.cc-play:hover {
+  background: mix(@cc_pink, @theme_text, 0.15);
+  color: @theme_bg;
+}
+
+/* Power mode: the three icons fill the tile. */
+window.nyx-control-center .cc-power .cc-segmented button {
+  min-height: 36px;
+}
+
+window.nyx-control-center .cc-battery-pct {
+  font-size: 12.5px;
+  font-weight: 500;
+  font-feature-settings: "tnum";
+}
+
+window.nyx-control-center .cc-battery.tint-red {
+  color: @cc_red;
+}
+
+window.nyx-control-center .cc-battery.tint-green image {
+  color: @cc_green;
+}
+
+/* Small icon buttons at the end of detail rows. */
+window.nyx-control-center button.cc-row-button {
+  min-width: 26px;
+  min-height: 26px;
+}
+
+window.nyx-control-center .cc-row.cc-dim {
+  opacity: 0.55;
 }

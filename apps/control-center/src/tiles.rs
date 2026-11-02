@@ -30,6 +30,7 @@ pub enum Detail {
     Wifi,
     Bluetooth,
     Vpn,
+    Tailscale,
 }
 
 impl Detail {
@@ -38,6 +39,7 @@ impl Detail {
             "wifi" => Some(Detail::Wifi),
             "bluetooth" => Some(Detail::Bluetooth),
             "vpn" => Some(Detail::Vpn),
+            "tailscale" => Some(Detail::Tailscale),
             _ => None,
         }
     }
@@ -68,30 +70,31 @@ pub fn kinds() -> Vec<Kind> {
             sizes: &[S::S2X1, S::S1X1],
             build: bluetooth_tile,
         },
-        Kind { id: "vpn", name: "VPN", icon: "network-vpn-symbolic", sizes: &[S::S2X1, S::S1X1], build: vpn },
         Kind {
-            id: "dnd",
-            name: "Do not disturb",
-            icon: "notifications-disabled-symbolic",
-            sizes: &[S::S1X1, S::S2X1],
-            build: dnd,
+            id: "tailscale",
+            name: "Tailscale",
+            icon: "network-vpn-symbolic",
+            sizes: &[S::S2X1, S::S1X1],
+            build: crate::route_tiles::tailscale,
         },
-        Kind { id: "mode", name: "Workspace mode", icon: "view-grid-symbolic", sizes: &[S::S1X1, S::S2X1], build: mode },
+        Kind {
+            id: "vpn",
+            name: "VPN",
+            icon: "security-high-symbolic",
+            sizes: &[S::S2X1, S::S1X1],
+            build: crate::route_tiles::vpn,
+        },
+        Kind { id: "dnd", name: "Do not disturb", icon: "notifications-disabled-symbolic", sizes: &[S::S1X1], build: dnd },
+        Kind { id: "mode", name: "Workspace mode", icon: "view-grid-symbolic", sizes: &[S::S1X1], build: mode },
         Kind {
             id: "sound",
             name: "Sound & brightness",
             icon: "audio-volume-high-symbolic",
-            sizes: &[S::S4X1, S::S2X1],
+            sizes: &[S::S4X2, S::S2X2],
             build: sound,
         },
-        Kind { id: "home", name: "Home", icon: "go-home-symbolic", sizes: &[S::S2X2, S::S4X2], build: crate::home_tile::build },
-        Kind {
-            id: "media",
-            name: "Now playing",
-            icon: "audio-x-generic-symbolic",
-            sizes: &[S::S2X1, S::S4X1],
-            build: media_tile,
-        },
+        Kind { id: "home", name: "Home", icon: "go-home-symbolic", sizes: &[S::S2X3, S::S4X3], build: crate::home_tile::build },
+        Kind { id: "media", name: "Now playing", icon: "audio-x-generic-symbolic", sizes: &[S::S4X2], build: media_tile },
         Kind {
             id: "power",
             name: "Power mode",
@@ -100,28 +103,22 @@ pub fn kinds() -> Vec<Kind> {
             build: power_tile,
         },
         Kind { id: "battery", name: "Battery", icon: "battery-good-symbolic", sizes: &[S::S1X1, S::S2X1], build: battery },
-        Kind {
-            id: "night-light",
-            name: "Night light",
-            icon: "night-light-symbolic",
-            sizes: &[S::S1X1, S::S2X1],
-            build: night_light,
-        },
+        Kind { id: "night-light", name: "Night light", icon: "night-light-symbolic", sizes: &[S::S1X1], build: night_light },
         Kind {
             id: "keep-awake",
             name: "Keep awake",
             icon: "preferences-desktop-screensaver-symbolic",
-            sizes: &[S::S1X1, S::S2X1],
+            sizes: &[S::S1X1],
             build: keep_awake,
         },
         Kind {
             id: "keyboard-light",
-            name: "Key light",
+            name: "Keyboard light",
             icon: "keyboard-brightness-symbolic",
-            sizes: &[S::S1X1, S::S2X1],
+            sizes: &[S::S1X1],
             build: keyboard_light,
         },
-        Kind { id: "capture", name: "Capture", icon: "camera-photo-symbolic", sizes: &[S::S1X1, S::S2X1], build: capture },
+        Kind { id: "capture", name: "Screenshot", icon: "camera-photo-symbolic", sizes: &[S::S1X1], build: capture },
     ]
 }
 
@@ -139,19 +136,19 @@ pub fn default_pages() -> Vec<Page> {
                 t("wifi", S::S2X1),
                 t("bluetooth", S::S2X1),
                 t("vpn", S::S2X1),
+                t("tailscale", S::S2X1),
                 t("dnd", S::S1X1),
                 t("mode", S::S1X1),
-                t("sound", S::S4X1),
-                t("home", S::S2X2),
-                t("media", S::S2X1),
-                t("power", S::S2X1),
                 t("night-light", S::S1X1),
                 t("keep-awake", S::S1X1),
+                t("sound", S::S4X2),
+                t("media", S::S4X2),
+                t("power", S::S2X1),
                 t("keyboard-light", S::S1X1),
                 t("capture", S::S1X1),
             ],
         },
-        Page { tiles: vec![t("battery", S::S1X1)] },
+        Page { tiles: vec![t("home", S::S4X3), t("battery", S::S1X1)] },
     ]
 }
 
@@ -164,9 +161,10 @@ pub fn frame(size: Size) -> gtk::Box {
     b
 }
 
-/// A toggle: chip and name (1×1: stacked; 2×1: side by side with a status line).
-/// Returns the tile, its chip and the status label.
-fn toggle(
+/// A toggle. 1×1: just its icon, centred (the tooltip names it and says its state).
+/// 2×1: the icon with its name and a status line. Returns the tile, its chip, the chip's
+/// icon and the status label.
+pub fn toggle(
     size: Size,
     icon_name: &str,
     name: &str,
@@ -175,24 +173,21 @@ fn toggle(
     let tile = frame(size);
     tile.add_css_class("cc-toggle");
     let (chip_box, chip_icon) = chip(icon_name);
-    let title = label(name, "cc-title");
     let status = label("", "cc-status");
     if size.cols == 1 {
-        title.set_wrap(true);
-        title.set_lines(2);
-        title.set_ellipsize(gtk::pango::EllipsizeMode::End);
-        title.set_valign(gtk::Align::End);
-        title.set_vexpand(true);
+        chip_box.set_halign(gtk::Align::Center);
+        chip_box.set_valign(gtk::Align::Center);
+        chip_box.set_vexpand(true);
         tile.append(&chip_box);
-        tile.append(&title);
         status.set_visible(false);
     } else {
         let row = gtk::Box::new(gtk::Orientation::Horizontal, 10);
         row.set_vexpand(true);
-        let text = gtk::Box::new(gtk::Orientation::Vertical, 1);
+        let text = gtk::Box::new(gtk::Orientation::Vertical, 0);
         text.set_valign(gtk::Align::Center);
-        text.append(&title);
+        text.append(&label(name, "cc-title"));
         text.append(&status);
+        chip_box.set_valign(gtk::Align::Center);
         row.append(&chip_box);
         row.append(&text);
         tile.append(&row);
@@ -202,8 +197,9 @@ fn toggle(
     (tile, chip_box, chip_icon, status)
 }
 
-/// A split tile (2×1): the main part toggles, the arrow opens the detail view.
-fn split(
+/// A split tile (2×1): the main part toggles, the arrow opens the detail view. 1×1 is a
+/// plain toggle.
+pub fn split(
     icon_name: &str,
     name: &str,
     on_toggle: impl Fn() + 'static,
@@ -212,11 +208,11 @@ fn split(
     let tile = gtk::Box::new(gtk::Orientation::Horizontal, 0);
     tile.add_css_class("cc-tile");
     tile.add_css_class("cc-split");
-    let main = gtk::Box::new(gtk::Orientation::Horizontal, 10);
+    let main = gtk::Box::new(gtk::Orientation::Horizontal, 8);
     main.add_css_class("cc-split-main");
     main.set_hexpand(true);
     let (chip_box, chip_icon) = chip(icon_name);
-    let text = gtk::Box::new(gtk::Orientation::Vertical, 1);
+    let text = gtk::Box::new(gtk::Orientation::Vertical, 0);
     text.set_valign(gtk::Align::Center);
     let title = label(name, "cc-title");
     let status = label("", "cc-status");
@@ -227,11 +223,17 @@ fn split(
     clickable(&main, on_toggle);
     let more = gtk::Button::from_icon_name("go-next-symbolic");
     more.add_css_class("cc-split-more");
-    more.set_tooltip_text(Some(&format!("{name} details")));
+    more.set_tooltip_text(Some(&format!("{name}: networks, devices and settings")));
     more.connect_clicked(move |_| on_more());
     tile.append(&main);
     tile.append(&more);
     (tile, chip_box, chip_icon, status)
+}
+
+/// Give a tile its colour (a theme swatch: blue, violet, pink, red, coral, amber,
+/// green, teal).
+pub fn tint(w: &impl IsA<gtk::Widget>, swatch: &str) {
+    w.add_css_class(&format!("tint-{swatch}"));
 }
 
 fn clickable(w: &impl IsA<gtk::Widget>, f: impl Fn() + 'static) {
@@ -261,8 +263,15 @@ fn wifi(ctx: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     } else {
         toggle(size, "network-wireless-symbolic", "Wi-Fi", toggle_wifi)
     };
+    tint(&tile, "blue");
     let t = tile.clone();
     bind(&tile, network::live(), move |st| {
+        t.set_tooltip_text(Some(&match (st.has_wifi, st.wifi_on, &st.ssid) {
+            (false, _, _) => "Wi-Fi: this computer has no Wi-Fi".to_string(),
+            (true, false, _) => "Wi-Fi is off. Click to turn it on".to_string(),
+            (true, true, Some(s)) => format!("Connected to {} ({}% signal). Click to turn Wi-Fi off", s.trim(), st.signal),
+            (true, true, None) => "Wi-Fi is on, not connected. Click to turn it off".to_string(),
+        }));
         on(&t, st.wifi_on && st.has_wifi);
         on(&chip_box, st.wifi_on);
         chip_icon.set_icon_name(Some(match (st.wifi_on, st.ssid.as_ref().map(|_| network::bars(st.signal))) {
@@ -292,8 +301,19 @@ fn bluetooth_tile(ctx: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     } else {
         toggle(size, "bluetooth-symbolic", "Bluetooth", toggle_bt)
     };
+    tint(&tile, "teal");
     let t = tile.clone();
     bind(&tile, bluetooth::live(), move |st| {
+        let names: Vec<String> = st.connected().iter().map(|d| d.name.clone()).collect();
+        t.set_tooltip_text(Some(&if !st.available {
+            "Bluetooth: no adapter found".to_string()
+        } else if !st.powered {
+            "Bluetooth is off. Click to turn it on".to_string()
+        } else if names.is_empty() {
+            "Bluetooth is on, nothing connected. Click to turn it off".to_string()
+        } else {
+            format!("Connected: {}. Click to turn Bluetooth off", names.join(", "))
+        }));
         on(&t, st.powered);
         on(&chip_box, st.powered);
         t.set_sensitive(st.available);
@@ -313,43 +333,19 @@ fn bluetooth_tile(ctx: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     tile.upcast()
 }
 
-fn vpn(ctx: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
-    // The main part turns the active VPN off, or the first one on.
-    let toggle_vpn = || {
-        let st = network::live().get();
-        if let Some(v) = st.vpn_active().cloned() {
-            act(async move { network::set_vpn(&v, false).await });
-        } else if let Some(v) = st.vpns.first().cloned() {
-            act(async move { network::set_vpn(&v, true).await });
-        }
-    };
-    let (tile, chip_box, _, status) = if size.cols >= 2 {
-        let o = ctx.open.clone();
-        split("network-vpn-symbolic", "VPN", toggle_vpn, move || o(Detail::Vpn))
-    } else {
-        toggle(size, "network-vpn-symbolic", "VPN", toggle_vpn)
-    };
-    let t = tile.clone();
-    bind(&tile, network::live(), move |st| {
-        let active = st.vpn_active();
-        on(&t, active.is_some());
-        on(&chip_box, active.is_some());
-        status.set_text(&match (active, st.vpns.is_empty()) {
-            (Some(v), _) => v.name.clone(),
-            (None, true) => "None set up".into(),
-            (None, false) => "Off".into(),
-        });
-    });
-    tile.upcast()
-}
-
 // ---------- Omarchy toggles ----------
 
 fn dnd(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     let (tile, chip_box, _, status) =
         toggle(size, "notifications-disabled-symbolic", "Do not disturb", || act(omarchy::toggle_dnd()));
+    tint(&tile, "violet");
     let t = tile.clone();
     bind(&tile, omarchy::live(), move |st| {
+        t.set_tooltip_text(Some(if st.dnd {
+            "Do not disturb is on: pop-ups stay quiet. Click to allow them"
+        } else {
+            "Do not disturb: click to silence pop-ups (they still reach the Notification Center)"
+        }));
         on(&t, st.dnd);
         on(&chip_box, st.dnd);
         status.set_text(if st.dnd { "On" } else { "Off" });
@@ -359,8 +355,14 @@ fn dnd(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
 
 fn night_light(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     let (tile, chip_box, _, status) = toggle(size, "night-light-symbolic", "Night light", || act(omarchy::toggle_night_light()));
+    tint(&tile, "coral");
     let t = tile.clone();
     bind(&tile, omarchy::live(), move |st| {
+        t.set_tooltip_text(Some(if st.night_light {
+            "Night light is on: warmer screen colours. Click to turn it off"
+        } else {
+            "Night light: click for warmer screen colours"
+        }));
         on(&t, st.night_light);
         on(&chip_box, st.night_light);
         status.set_text(if st.night_light { "On" } else { "Off" });
@@ -371,8 +373,14 @@ fn night_light(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
 fn keep_awake(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     let (tile, chip_box, _, status) =
         toggle(size, "preferences-desktop-screensaver-symbolic", "Keep awake", || act(omarchy::toggle_keep_awake()));
+    tint(&tile, "amber");
     let t = tile.clone();
     bind(&tile, omarchy::live(), move |st| {
+        t.set_tooltip_text(Some(if st.keep_awake {
+            "Keep awake is on: the screen won't dim, lock or sleep. Click to turn it off"
+        } else {
+            "Keep awake: click to stop the screen dimming, locking or sleeping"
+        }));
         on(&t, st.keep_awake);
         on(&chip_box, st.keep_awake);
         status.set_text(if st.keep_awake { "Screen stays on" } else { "Off" });
@@ -388,12 +396,19 @@ fn mode(ctx: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
         }
     });
     on(&chip_box, true);
+    tint(&tile, "green");
     let title = find_title(&tile);
+    let t = tile.clone();
     bind(&tile, ctx.mode.clone(), move |m| {
         let mode = m.mode.unwrap_or(M::Tiling);
         if let Some(t) = &title {
             t.set_text(mode.label());
         }
+        t.set_tooltip_text(Some(&format!(
+            "Workspace {}: {}. Click for the next mode (tiling, scrolling, floating)",
+            m.workspace,
+            mode.label().to_lowercase()
+        )));
         chip_icon.set_icon_name(Some(match mode {
             M::Tiling => "view-grid-symbolic",
             M::Scrolling => "view-continuous-symbolic",
@@ -401,7 +416,6 @@ fn mode(ctx: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
         }));
         status.set_text(&format!("Workspace {}", m.workspace));
     });
-    tile.set_tooltip_text(Some("Workspace mode: click for the next"));
     tile.upcast()
 }
 
@@ -433,6 +447,8 @@ fn capture(ctx: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
         glib::timeout_add_local_once(std::time::Duration::from_millis(250), || ui::launch(&["omarchy-capture-screenshot"]));
     });
     status.set_text("Screenshot");
+    tint(&tile, "pink");
+    tile.set_tooltip_text(Some("Screenshot: closes this panel, then pick an area, a window or the screen"));
     tile.upcast()
 }
 
@@ -446,10 +462,16 @@ fn keyboard_light(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
             act(async move { brightness::set(&device, next as f64 / k.max as f64).await });
         }
     });
+    tint(&tile, "teal");
     let t = tile.clone();
     bind(&tile, brightness::live(), move |st| {
         t.set_visible(st.keyboard.is_some() || st.screen.is_none());
         let level = st.keyboard.as_ref().map_or(0.0, |k| k.value);
+        t.set_tooltip_text(Some(&if level > 0.0 {
+            format!("Keyboard light at {}%. Click for the next level", (level * 100.0).round())
+        } else {
+            "Keyboard light is off. Click to turn it on".to_string()
+        }));
         on(&t, level > 0.0);
         on(&chip_box, level > 0.0);
         status.set_text(&if level > 0.0 { format!("{}%", (level * 100.0).round()) } else { "Off".into() });
@@ -462,14 +484,21 @@ fn keyboard_light(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
 fn sound(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     let tile = frame(size);
     tile.add_css_class("cc-sliders");
-    let (vrow, vbutton, vscale, vvalue) = ui::slider("audio-volume-high-symbolic", "Sound outputs and apps");
+    // Each slider gets half the tile, so the space above and below them is equal.
+    tile.set_homogeneous(true);
+    let (vrow, vbutton, vscale, vvalue) = ui::slider("audio-volume-high-symbolic", "Sound: outputs and each app's volume");
+    vrow.add_css_class("tint-blue");
     vscale.set_range(0.0, 1.5);
     vscale.add_mark(1.0, gtk::PositionType::Bottom, None);
     let out = icon_button("audio-speakers-symbolic", "Mute");
     vrow.append(&out);
     tile.append(&vrow);
-    let (brow, bbutton, bscale, bvalue) = ui::slider("display-brightness-symbolic", "Display settings");
-    brow.append(&icon_button("video-display-symbolic", "Displays"));
+    let (brow, bbutton, bscale, bvalue) =
+        ui::slider("display-brightness-symbolic", "Display settings: resolution, scale, arrangement");
+    brow.add_css_class("tint-amber");
+    bscale.set_range(0.01, 1.0);
+    let screens = icon_button("video-display-symbolic", "Display settings");
+    brow.append(&screens);
     tile.append(&brow);
 
     // Dragging sets the value; a value coming back from the system mustn't fight it.
@@ -490,48 +519,43 @@ fn sound(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
             return;
         }
         let v = s.value();
-        let device = brightness::live().get().screen.map(|l| l.device).unwrap_or_default();
-        debounce.call(move || act(async move { brightness::set(&device, v).await }));
+        debounce.call(move || act(brightness::set_screen(v)));
     });
     out.connect_clicked(|_| act(audio::set_muted(!audio::live().get().muted)));
     vbutton.connect_clicked(crate::details::volume_popover);
     bbutton.connect_clicked(|_| ui::open_settings("displays"));
+    screens.connect_clicked(|_| ui::open_settings("displays"));
 
-    let (p, vs, vv, o, vb) = (pushing.clone(), vscale.clone(), vvalue.clone(), out.clone(), vbutton.clone());
+    let (p, vs, vv, o, vb, vr) = (pushing.clone(), vscale.clone(), vvalue.clone(), out.clone(), vbutton.clone(), vrow.clone());
     bind(&tile, audio::live(), move |st| {
         p.set(true);
         vs.set_value(st.volume);
         p.set(false);
-        vv.set_text(&if st.muted { "Off".into() } else { format!("{}%", (st.volume * 100.0).round()) });
+        let pct = (st.volume * 100.0).round();
+        vv.set_text(&if st.muted { "Off".into() } else { format!("{pct}%") });
         vb.set_icon_name(match (st.muted, st.volume) {
             (true, _) => "audio-volume-muted-symbolic",
             (_, v) if v < 0.34 => "audio-volume-low-symbolic",
             (_, v) if v < 0.67 => "audio-volume-medium-symbolic",
             _ => "audio-volume-high-symbolic",
         });
+        let name = st.current().map(|o| o.description.clone()).unwrap_or_else(|| "the speakers".into());
         let kind = st.current().map(|o| o.kind.as_str()).unwrap_or("speaker");
-        o.set_icon_name(match kind {
-            "headphones" => "audio-headphones-symbolic",
-            "hdmi" => "video-display-symbolic",
-            "bluetooth" => "bluetooth-symbolic",
-            _ => "audio-speakers-symbolic",
-        });
-        o.set_tooltip_text(Some(&format!(
-            "{} ({})",
-            if st.muted { "Unmute" } else { "Mute" },
-            st.current().map(|o| o.description.as_str()).unwrap_or("output")
-        )));
+        o.set_icon_name(output_icon(kind));
+        o.set_tooltip_text(Some(&if st.muted { format!("{name} is muted. Click to unmute") } else { format!("Mute {name}") }));
+        vr.set_tooltip_text(Some(&format!("Volume {pct}% on {name}")));
         set_class(&o, "on", st.muted);
     });
-    let (p, bs) = (pushing, bscale.clone());
-    let br = brow.clone();
+    let (p, bs, br) = (pushing, bscale.clone(), brow.clone());
     bind(&tile, brightness::live(), move |st| {
         br.set_visible(st.screen.is_some());
         if let Some(s) = &st.screen {
             p.set(true);
-            bs.set_value(s.value);
+            bs.set_value(s.value.max(0.01));
             p.set(false);
-            bvalue.set_text(&format!("{}%", (s.value * 100.0).round()));
+            let pct = (s.value * 100.0).round();
+            bvalue.set_text(&format!("{pct}%"));
+            br.set_tooltip_text(Some(&format!("Brightness of {}: {pct}%", s.device)));
         }
     });
     tile.upcast()
@@ -542,22 +566,25 @@ fn sound(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
 fn media_tile(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     let tile = frame(size);
     tile.add_css_class("cc-media");
-    let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
+    tint(&tile, "pink");
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 14);
     row.set_vexpand(true);
     let art = gtk::Image::new();
-    art.set_pixel_size(52);
+    art.set_pixel_size(80);
     art.add_css_class("cc-art");
     art.set_valign(gtk::Align::Center);
-    let text = gtk::Box::new(gtk::Orientation::Vertical, 1);
+    let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
     text.set_valign(gtk::Align::Center);
     text.set_hexpand(true);
-    let title = label("", "cc-title");
+    let title = label("", "cc-media-title");
     let artist = label("", "cc-status");
-    let buttons = gtk::Box::new(gtk::Orientation::Horizontal, 2);
+    let player = label("", "cc-media-player");
+    let buttons = gtk::Box::new(gtk::Orientation::Horizontal, 4);
     buttons.add_css_class("cc-media-buttons");
-    let prev = icon_button("media-skip-backward-symbolic", "Previous");
+    let prev = icon_button("media-skip-backward-symbolic", "Previous track");
     let play = icon_button("media-playback-start-symbolic", "Play");
-    let next = icon_button("media-skip-forward-symbolic", "Next");
+    play.add_css_class("cc-play");
+    let next = icon_button("media-skip-forward-symbolic", "Next track");
     prev.connect_clicked(|_| media::command("Previous"));
     play.connect_clicked(|_| media::command("PlayPause"));
     next.connect_clicked(|_| media::command("Next"));
@@ -566,6 +593,7 @@ fn media_tile(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     }
     text.append(&title);
     text.append(&artist);
+    text.append(&player);
     text.append(&buttons);
     row.append(&art);
     row.append(&text);
@@ -582,6 +610,8 @@ fn media_tile(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
         });
         artist.set_text(&st.artist);
         artist.set_visible(!st.artist.is_empty());
+        player.set_text(&player_name(&st.player));
+        player.set_visible(!nothing);
         buttons.set_sensitive(!nothing);
         prev.set_sensitive(st.can_previous);
         next.set_sensitive(st.can_next);
@@ -598,26 +628,41 @@ fn media_tile(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     tile.upcast()
 }
 
+/// A player's name from its bus name: `org.mpris.MediaPlayer2.firefox.instance_1_5` is
+/// "Firefox", `…spotify` "Spotify", a Nyx app's "Music".
+pub fn player_name(bus: &str) -> String {
+    let rest = bus.strip_prefix("org.mpris.MediaPlayer2.").unwrap_or(bus);
+    let name = if rest.starts_with("io.github.") || rest.starts_with("org.") || rest.starts_with("com.") {
+        rest.split('.').next_back().unwrap_or(rest)
+    } else {
+        rest.split('.').next().unwrap_or(rest)
+    };
+    let mut c = name.chars();
+    match c.next() {
+        Some(f) => f.to_uppercase().chain(c).collect(),
+        None => String::new(),
+    }
+}
+
+/// Power mode: just its three icons.
 fn power_tile(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     use power::Profile as P;
     let tile = frame(size);
     tile.add_css_class("cc-power");
-    let title = label("Power mode", "cc-title");
-    title.set_vexpand(true);
-    title.set_valign(gtk::Align::Start);
-    tile.append(&title);
     let seg = gtk::Box::new(gtk::Orientation::Horizontal, 2);
     seg.add_css_class("cc-segmented");
     seg.set_homogeneous(true);
+    seg.set_vexpand(true);
     let mut buttons: Vec<(P, gtk::ToggleButton)> = Vec::new();
-    for (p, icon_name) in [
-        (P::PowerSaver, "power-profile-power-saver-symbolic"),
-        (P::Balanced, "power-profile-balanced-symbolic"),
-        (P::Performance, "power-profile-performance-symbolic"),
+    for (p, icon_name, swatch, tip) in [
+        (P::PowerSaver, "power-profile-power-saver-symbolic", "green", "Power saver: longer battery life, slower"),
+        (P::Balanced, "power-profile-balanced-symbolic", "blue", "Balanced: the everyday setting"),
+        (P::Performance, "power-profile-performance-symbolic", "coral", "Performance: fastest, uses more power and runs warmer"),
     ] {
         let b = gtk::ToggleButton::new();
-        b.set_child(Some(&icon(icon_name, 16)));
-        b.set_tooltip_text(Some(p.label()));
+        b.set_child(Some(&icon(icon_name, 18)));
+        b.set_tooltip_text(Some(tip));
+        tint(&b, swatch);
         if let Some((_, first)) = buttons.first() {
             b.set_group(Some(first));
         }
@@ -631,7 +676,6 @@ fn power_tile(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     }
     tile.append(&seg);
     bind(&tile, power::live(), move |st| {
-        title.set_text(st.profile.map(|p| p.label()).unwrap_or("Power mode"));
         for (p, b) in &buttons {
             b.set_visible(st.profiles.is_empty() || st.profiles.contains(p));
             if st.profile == Some(*p) && !b.is_active() {
@@ -643,18 +687,27 @@ fn power_tile(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
 }
 
 fn battery(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
-    let (tile, _, chip_icon, status) = toggle(size, "battery-good-symbolic", "Battery", || ui::open_settings("power"));
-    let title = find_title(&tile);
+    let tile = frame(size);
+    tile.add_css_class("cc-battery");
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    row.set_halign(gtk::Align::Center);
+    row.set_valign(gtk::Align::Center);
+    row.set_vexpand(true);
+    let img = icon("battery-good-symbolic", 18);
+    let pct = gtk::Label::new(None);
+    pct.add_css_class("cc-battery-pct");
+    row.append(&img);
+    row.append(&pct);
+    tile.append(&row);
+    clickable(&tile, || ui::open_settings("power"));
+    let t = tile.clone();
     bind(&tile, power::live(), move |st| {
         let Some(b) = &st.battery else {
-            if let Some(t) = &title {
-                t.set_text("No battery");
-            }
+            pct.set_text("");
+            t.set_tooltip_text(Some("No battery"));
             return;
         };
-        if let Some(t) = &title {
-            t.set_text(&format!("{}%", b.percent.round()));
-        }
+        pct.set_text(&format!("{}%", b.percent.round()));
         let level = match b.percent as u32 {
             0..=10 => "empty",
             11..=30 => "caution",
@@ -662,14 +715,17 @@ fn battery(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
             61..=90 => "good",
             _ => "full",
         };
-        chip_icon.set_icon_name(Some(&format!("battery-{level}{}-symbolic", if b.charging { "-charging" } else { "" })));
-        status.set_text(&match (b.charging, b.full, b.time) {
-            (_, true, _) => "Full".into(),
-            (true, _, Some(t)) => format!("{} to full", power::duration(t)),
-            (true, _, None) => "Charging".into(),
-            (false, _, Some(t)) => format!("{} left", power::duration(t)),
-            (false, _, None) => "On battery".into(),
-        });
+        img.set_icon_name(Some(&format!("battery-{level}{}-symbolic", if b.charging { "-charging" } else { "" })));
+        set_class(&t, "tint-red", b.percent < 15.0 && !b.charging);
+        set_class(&t, "tint-green", b.charging || b.full);
+        let state = match (b.charging, b.full, b.time) {
+            (_, true, _) => "full".to_string(),
+            (true, _, Some(time)) => format!("charging, full in {}", power::duration(time)),
+            (true, _, None) => "charging".to_string(),
+            (false, _, Some(time)) => format!("{} left", power::duration(time)),
+            (false, _, None) => "on battery".to_string(),
+        };
+        t.set_tooltip_text(Some(&format!("Battery {}%, {state}. Click for power settings", b.percent.round())));
     });
     tile.upcast()
 }
@@ -688,4 +744,14 @@ pub fn output_icon(kind: &str) -> &'static str {
 pub fn app_icon(binary: &str, icon_name: Option<&str>) -> gio::Icon {
     let name = icon_name.map(str::to_string).unwrap_or_else(|| binary.to_lowercase());
     gio::ThemedIcon::with_default_fallbacks(&name).upcast()
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn player_names() {
+        assert_eq!(super::player_name("org.mpris.MediaPlayer2.firefox.instance_1_511"), "Firefox");
+        assert_eq!(super::player_name("org.mpris.MediaPlayer2.spotify"), "Spotify");
+        assert_eq!(super::player_name("org.mpris.MediaPlayer2.io.github.design_nexus.nyx.Music"), "Music");
+    }
 }

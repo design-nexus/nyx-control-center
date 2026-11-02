@@ -8,6 +8,7 @@
 mod details;
 mod home_tile;
 mod panel;
+mod route_tiles;
 mod theme;
 mod tiles;
 mod ui;

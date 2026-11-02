@@ -33,11 +33,19 @@ Two bar widgets are installed; add them from Settings → Plugins (or
 
 ## What it does
 
-- **Wi-Fi, Bluetooth, VPN**: the tile switches it on or off; the arrow opens the full
-  list in the panel (join networks, with the password typed in place; metered
-  connection; connect or disconnect paired devices; turn VPNs and Tailscale on or off).
+- **Wi-Fi, Bluetooth**: the tile switches it on or off; the arrow opens the full list in
+  the panel: join networks (the password typed in place), metered connection, the DNS
+  provider (Cloudflare, Google, the network's own, or your own), the Wi-Fi band, a
+  network's sign-in page, a speed test and a QR code to share the network; connect or
+  disconnect paired devices.
+- **VPN**: where traffic goes, directly, through NordVPN or through Tor, only one at a
+  time; NordVPN's country and settings (kill switch, auto-connect); Tor's mode, exit and
+  a new circuit; and NetworkManager's own VPN connections.
+- **Tailscale**: on or off; this machine's address and name to copy; the tailnet's
+  machines (copy an address or name, send files); the exit node; accounts.
 - **Sound and brightness** sliders. The speaker button opens outputs and each app's
-  volume; the output button mutes.
+  volume; the output button mutes. Brightness is the focused screen's: the laptop's
+  backlight, or an external monitor over DDC, as Omarchy's brightness keys do.
 - **Home**: a room's lights and devices from Nyx Home (pick the room from the tile's
   header), with its scenes. Click to switch a device; right-click a light for brightness
   and colour. Home's service (`nyx-homed`) does the talking to Home Assistant, so Home
@@ -77,16 +85,18 @@ tiles = [
 tiles = [{ widget = "battery", size = "1x1" }]
 ```
 
-Tiles fill a 4-column grid in order, each in the first place it fits. Widgets and the
+Tiles fill a 4-column grid of 48-pixel rows in order, each in the first place it fits. Widgets and the
 sizes they come in:
 
 | Widget | Sizes |
 | --- | --- |
-| `wifi`, `bluetooth`, `vpn` | 2x1 (with details), 1x1 |
-| `sound` (volume and brightness) | 4x1, 2x1 |
-| `home` | 2x2, 4x2 |
-| `media`, `power` | 2x1, 4x1 |
-| `dnd`, `mode`, `night-light`, `keep-awake`, `keyboard-light`, `capture`, `battery` | 1x1, 2x1 |
+| `wifi`, `bluetooth`, `vpn`, `tailscale` | 2x1 (with details), 1x1 |
+| `sound` (volume and brightness) | 4x2, 2x2 |
+| `home` | 2x3, 4x3 |
+| `media` | 4x2 |
+| `power` | 2x1, 4x1 |
+| `battery` | 1x1, 2x1 |
+| `dnd`, `mode`, `night-light`, `keep-awake`, `keyboard-light`, `capture` | 1x1 |
 
 ## Build
 

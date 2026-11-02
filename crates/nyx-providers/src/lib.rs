@@ -12,15 +12,21 @@
 //! | [`home`] | Nyx Home's service (`Home.Devices1`) | read every 3 s while shown |
 //! | [`media`] | MPRIS players (D-Bus) | D-Bus signals |
 //! | [`omarchy`] | Omarchy's toggles and state files | file monitors |
+//! | [`tailscale`] | `tailscale status --json` | read every 5 s while shown |
+//! | [`routes`] | NordVPN and Tor (`nordvpn`, `tormarchy`) | read every 4 s while shown |
+//! | [`dns`] | Omarchy's DNS provider (`omarchy-dns`) | read when shown |
 
 pub mod audio;
 pub mod bluetooth;
 pub mod brightness;
+pub mod dns;
 pub mod home;
 pub mod media;
 pub mod network;
 pub mod omarchy;
 pub mod power;
+pub mod routes;
+pub mod tailscale;
 
 use gio::prelude::*;
 use std::cell::RefCell;
@@ -50,6 +56,11 @@ pub async fn run(args: &[&str], stdin: Option<&str>) -> Result<(), String> {
     } else {
         Err(err.map(|e| e.trim().to_string()).filter(|e| !e.is_empty()).unwrap_or_else(|| format!("{} failed", args[0])))
     }
+}
+
+/// A program is on PATH.
+pub fn present(program: &str) -> bool {
+    std::env::var_os("PATH").is_some_and(|p| std::env::split_paths(&p).any(|d| d.join(program).is_file()))
 }
 
 /// Fire and forget.
