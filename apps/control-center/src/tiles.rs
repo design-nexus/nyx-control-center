@@ -32,6 +32,17 @@ pub enum Detail {
     Vpn,
 }
 
+impl Detail {
+    pub fn parse(s: &str) -> Option<Detail> {
+        match s {
+            "wifi" => Some(Detail::Wifi),
+            "bluetooth" => Some(Detail::Bluetooth),
+            "vpn" => Some(Detail::Vpn),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Mode {
     pub workspace: i64,

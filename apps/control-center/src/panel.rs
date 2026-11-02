@@ -73,6 +73,8 @@ pub struct Panel {
     tray: gtk::Box,
     me: RefCell<std::rc::Weak<Panel>>,
     panel1: RefCell<Option<nyx_desktop::panel::Panel>>,
+    /// The detail view last opened.
+    detail: Cell<Option<Detail>>,
 }
 
 impl Panel {
@@ -102,13 +104,25 @@ impl Panel {
             self.set_editing(true);
         }
         // For screenshots: open a detail view straight away.
-        if let Some(which) = std::env::var("NYX_CC_TEST_DETAIL").ok().and_then(|d| match d.as_str() {
-            "wifi" => Some(Detail::Wifi),
-            "bluetooth" => Some(Detail::Bluetooth),
-            "vpn" => Some(Detail::Vpn),
-            _ => None,
-        }) {
-            self.open_detail(which, Rc::new(|| {}));
+        if let Some(which) = std::env::var("NYX_CC_TEST_DETAIL").ok().as_deref().and_then(Detail::parse) {
+            self.show_detail(which);
+        }
+    }
+
+    /// Open on one list (Wi-Fi, Bluetooth, VPN); close if it's already showing.
+    pub fn toggle_detail(&self, which: Detail) {
+        if self.is_open() && self.detail.get() == Some(which) && self.content.visible_child_name().as_deref() == Some("detail") {
+            self.hide();
+            return;
+        }
+        self.show();
+        self.show_detail(which);
+    }
+
+    fn show_detail(&self, which: Detail) {
+        let open = self.ctx.borrow().as_ref().map(|c| c.open.clone());
+        if let Some(open) = open {
+            open(which);
         }
     }
 
@@ -339,6 +353,7 @@ impl Panel {
         if let Some(d) = self.content.child_by_name("detail") {
             self.content.remove(&d);
         }
+        self.detail.set(Some(which));
         let view = details::view(which, back);
         self.content.add_named(&view, Some("detail"));
         self.content.set_visible_child_name("detail");
@@ -462,6 +477,7 @@ pub fn build(app: &gtk::Application, only: Option<String>) -> Rc<Panel> {
         tray: gtk::Box::new(gtk::Orientation::Vertical, 0),
         me: RefCell::default(),
         panel1: RefCell::default(),
+        detail: Cell::new(None),
     });
     *panel.me.borrow_mut() = Rc::downgrade(&panel);
 

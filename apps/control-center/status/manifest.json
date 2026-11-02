@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "id": "design-nexus.status",
+  "name": "Nyx Status",
+  "version": "0.1.0",
+  "author": "Ken",
+  "license": "MIT",
+  "description": "Temperature, CPU and memory use, and the network, Bluetooth, sound and battery at a glance; clicks open the Nyx Control Center.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Nyx Status",
+    "description": "Click the weather for Weather, the CPU and memory for Activity, anything else for the Control Center. Scroll the speaker to change the volume; right-click it to mute.",
+    "category": "System",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "weather": true,
+      "system": true,
+      "network": true,
+      "bluetooth": true,
+      "sound": true,
+      "battery": true,
+      "batteryPercent": true
+    },
+    "schema": [
+      { "key": "weather", "type": "boolean", "label": "Weather", "description": "Current conditions and temperature from Nyx Weather.", "defaultValue": true },
+      { "key": "system", "type": "boolean", "label": "CPU and memory", "defaultValue": true },
+      { "key": "network", "type": "boolean", "label": "Network", "defaultValue": true },
+      { "key": "bluetooth", "type": "boolean", "label": "Bluetooth", "defaultValue": true },
+      { "key": "sound", "type": "boolean", "label": "Sound", "defaultValue": true },
+      { "key": "battery", "type": "boolean", "label": "Battery", "description": "Hidden on computers without one.", "defaultValue": true },
+      { "key": "batteryPercent", "type": "boolean", "label": "Battery percentage", "defaultValue": true }
+    ]
+  }
+}

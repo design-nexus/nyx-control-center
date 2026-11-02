@@ -1,7 +1,8 @@
 //! Nyx Control Center: quick settings for Omarchy and Hyprland.
 //!
 //! `nyx-control-center` starts it (hidden; normally as a user service).
-//! `nyx-control-center --toggle | --show | --hide` opens or closes the running one.
+//! `nyx-control-center --toggle | --show | --hide` opens or closes the running one;
+//! `--toggle wifi | bluetooth | vpn` opens it on that list.
 //! `--only <output>` keeps it on one output (for trying it on a test output).
 
 mod details;
@@ -39,8 +40,9 @@ fn main() -> std::process::ExitCode {
         let args: Vec<String> = cmd.arguments().iter().skip(1).map(|a| a.to_string_lossy().to_string()).collect();
         if args.iter().any(|a| a == "-h" || a == "--help") {
             println!(
-                "Usage: nyx-control-center [--toggle | --show | --hide] [--only <output>]\n\n\
-                 With no option, start (hidden). The options open or close the running one."
+                "Usage: nyx-control-center [--toggle [wifi|bluetooth|vpn] | --show | --hide] [--only <output>]\n\n\
+                 With no option, start (hidden). The options open or close the running one;\n\
+                 --toggle with a list's name opens it on that list."
             );
             return glib::ExitCode::SUCCESS;
         }
@@ -50,8 +52,11 @@ fn main() -> std::process::ExitCode {
             *p.borrow_mut() = Some(panel::build(app, only));
         }
         let panel = p.borrow().clone().expect("built");
-        if args.iter().any(|a| a == "--toggle") {
-            panel.toggle();
+        if let Some(i) = args.iter().position(|a| a == "--toggle") {
+            match args.get(i + 1).and_then(|a| tiles::Detail::parse(a)) {
+                Some(which) => panel.toggle_detail(which),
+                None => panel.toggle(),
+            }
         } else if args.iter().any(|a| a == "--show") {
             panel.show();
         } else if args.iter().any(|a| a == "--hide") {

@@ -13,11 +13,23 @@ curl -fsSL https://raw.githubusercontent.com/design-nexus/nyx-control-center/mai
 It runs as a user service and stays hidden until you open it:
 
 ```sh
-nyx-control-center --toggle     # open or close (bind a key to this)
+nyx-control-center --toggle        # open or close (bind a key to this)
+nyx-control-center --toggle wifi   # open on the Wi-Fi list (also bluetooth, vpn)
 ```
 
-Click outside it or press Esc to close it. A bar button is installed too; add it to the
-bar from Settings → Plugins (or `omarchy-plugin-enable design-nexus.control-center right`).
+Click outside it or press Esc to close it.
+
+## In the bar
+
+Two bar widgets are installed; add them from Settings → Plugins (or
+`omarchy-plugin-enable design-nexus.status right`):
+
+- **Nyx Status** shows things at a glance: the weather from Nyx Weather, CPU and memory
+  use, and the network, Bluetooth, sound and battery. Clicking the weather opens Weather;
+  CPU and memory open Activity; the network and Bluetooth icons open the Control Center
+  on their lists; the others open the Control Center. Scroll the speaker to change the
+  volume, right-click it to mute. Each part can be turned off in the widget's settings.
+- **Control Center button**: one icon that opens or closes the panel.
 
 ## What it does
 

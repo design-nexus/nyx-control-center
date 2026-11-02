@@ -54,13 +54,16 @@ install -m 755 "$target/nyx-control-center" "$bin/nyx-control-center.new" && mv 
 install -m 644 "$src/apps/control-center/data/nyx-control-center.service" "$units/nyx-control-center.service"
 systemctl --user daemon-reload 2>/dev/null || true
 
-# The bar button, for omarchy-shell. It's put in place, not added to the bar: turn it on
-# from Settings → Plugins (or `omarchy-plugin-enable design-nexus.control-center right`).
+# The bar button and the Nyx Status widget, for omarchy-shell. They're put in place, not
+# added to the bar: turn them on from Settings → Plugins (or
+# `omarchy-plugin-enable design-nexus.control-center right`, `… design-nexus.status right`).
 plugins="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins"
 if [[ -d $plugins ]]; then
-  mkdir -p "$plugins/design-nexus.control-center"
-  install -m 644 "$src/apps/control-center/plugin/manifest.json" "$src/apps/control-center/plugin/BarWidget.qml" \
-    "$plugins/design-nexus.control-center/"
+  for p in control-center:plugin status:status; do
+    mkdir -p "$plugins/design-nexus.${p%%:*}"
+    install -m 644 "$src/apps/control-center/${p#*:}/manifest.json" "$src/apps/control-center/${p#*:}/BarWidget.qml" \
+      "$plugins/design-nexus.${p%%:*}/"
+  done
   omarchy-shell shell rescanPlugins >/dev/null 2>&1 || true
 fi
 
