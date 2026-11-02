@@ -436,12 +436,15 @@ pub fn build(app: &gtk::Application, only: Option<String>) -> Rc<Panel> {
     catcher.add_css_class("cc-catcher");
     catcher.init_layer_shell();
     catcher.set_namespace(Some("nyx-control-center-catcher"));
-    catcher.set_layer(Layer::Top);
+    // On the panel's own layer (mapped first, so the panel stays above it) and over the
+    // bar and the dock: they're on the layer below, and the bar's surface spans the
+    // whole screen, so a catcher under them never sees the click.
+    catcher.set_layer(Layer::Overlay);
     catcher.set_keyboard_mode(KeyboardMode::None);
     for e in [Edge::Top, Edge::Bottom, Edge::Left, Edge::Right] {
         catcher.set_anchor(e, true);
     }
-    catcher.set_exclusive_zone(0);
+    catcher.set_exclusive_zone(-1);
     catcher.set_child(Some(&gtk::Box::new(gtk::Orientation::Horizontal, 0)));
 
     let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
