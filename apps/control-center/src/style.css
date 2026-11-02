@@ -4,7 +4,8 @@
 
 window.nyx-control-center,
 window.cc-catcher {
-  background: transparent;
+  /* Not quite transparent: some compositors pass clicks through fully clear pixels. */
+  background: rgba(0, 0, 0, 0.004);
 }
 
 window.nyx-control-center .cc-panel {

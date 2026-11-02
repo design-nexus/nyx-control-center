@@ -617,6 +617,14 @@ pub fn build(app: &gtk::Application, only: Option<String>) -> Rc<Panel> {
         }
     });
     catcher.add_controller(click);
+    // The whole surface takes clicks: say so, rather than leave it to the toolkit (a
+    // transparent surface can otherwise come out with no input region at all).
+    catcher.connect_realize(|w| {
+        if let Some(surface) = w.surface() {
+            let all = gtk::cairo::Region::create_rectangle(&gtk::cairo::RectangleInt::new(0, 0, 100_000, 100_000));
+            surface.set_input_region(Some(&all));
+        }
+    });
 
     // Never with the Notification Center: opening one closes the other.
     if let Some(conn) = app.dbus_connection() {
