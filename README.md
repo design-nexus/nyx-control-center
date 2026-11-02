@@ -25,7 +25,9 @@ Two bar widgets are installed; add them from Settings → Plugins (or
 `omarchy-plugin-enable design-nexus.status right`):
 
 - **Nyx Status** shows things at a glance: the weather from Nyx Weather, CPU and memory
-  use, and the network, Bluetooth, sound and battery. Clicking the weather opens Weather;
+  use with the CPU temperature, GPU use and temperature (where the driver publishes them:
+  AMD, Intel Xe), disk space if you turn it on, and the network, Bluetooth, sound and
+  battery. Clicking the weather opens Weather;
   CPU and memory open Activity; the network and Bluetooth icons open the Control Center
   on their lists; the others open the Control Center. Scroll the speaker to change the
   volume, right-click it to mute. Each part can be turned off in the widget's settings.
@@ -40,12 +42,12 @@ Two bar widgets are installed; add them from Settings → Plugins (or
   speed test and a QR code to share the network; connect, disconnect, forget and pair
   Bluetooth devices.
 - **VPN**: where traffic goes, directly, through NordVPN or through Tor, only one at a
-  time; NordVPN's country and city, pause, technology and settings (kill switch,
-  auto-connect); Tor's mode, exit country, a new circuit, latency, bridges, a Tor-only
+  time; NordVPN's country and city, pause, technology, protocol (with OpenVPN) and
+  settings (kill switch, auto-connect); Tor's mode, exit country, a new circuit, latency, bridges, a Tor-only
   browser and panic; and NetworkManager's own VPN connections.
 - **Tailscale**: on or off; this machine's address and name to copy; the tailnet's
-  machines, searchable (copy an address or name, send files); the exit node, Mullvad's
-  by country and city; accounts.
+  machines, searchable (copy an address or name, send files); receiving files (saved to
+  Downloads); the exit node, Mullvad's by country and city; accounts.
 - **Sound and brightness** sliders. The speaker button opens outputs, each app's volume
   and the microphone (level, mute, which input, which apps are recording); the output
   button mutes. Brightness is the focused screen's: the laptop's backlight, or an

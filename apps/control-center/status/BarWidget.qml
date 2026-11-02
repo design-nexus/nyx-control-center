@@ -31,6 +31,17 @@ BarWidget {
   property int cpuPercent: -1
   property int memPercent: -1
   property string memTip: ""
+  // Found once at start: the CPU package temperature, and a GPU's busy counter and
+  // temperature where sysfs has them (AMD, Intel Xe; not NVIDIA's driver, which would
+  // need nvidia-smi and wake the GPU).
+  property string cpuTempPath: ""
+  property string gpuBusyPath: ""
+  property string gpuTempPath: ""
+  property int cpuTemp: -1
+  property int gpuPercent: -1
+  property int gpuTemp: -1
+  property int diskPercent: -1
+  property string diskTip: ""
 
   function readCpu(raw) {
     var f = String(raw || "").split("\n")[0].trim().split(/\s+/)
@@ -149,9 +160,24 @@ BarWidget {
     WidgetButton {
       visible: root.setting("system", true) && root.cpuPercent >= 0 && !root.vertical
       bar: root.bar
-      text: "󰻠 " + root.cpuPercent + "%  󰍛 " + root.memPercent + "%"
+      text: {
+        var parts = ["\u{f0ee0} " + root.cpuPercent + "%"]
+        if (root.setting("temperature", true) && root.cpuTemp > 0) parts[0] += " " + root.cpuTemp + "°"
+        parts.push("\u{f035b} " + root.memPercent + "%")
+        if (root.setting("gpu", true) && root.gpuPercent >= 0)
+          parts.push("\u{f08ae} " + root.gpuPercent + "%" + (root.gpuTemp > 0 ? " " + root.gpuTemp + "°" : ""))
+        if (root.setting("disk", false) && root.diskPercent >= 0) parts.push("\u{f02ca} " + root.diskPercent + "%")
+        return parts.join("  ")
+      }
       horizontalMargin: 6
-      tooltipText: "CPU " + root.cpuPercent + "% · Memory " + root.memTip
+      tooltipText: {
+        var lines = ["CPU " + root.cpuPercent + "%" + (root.cpuTemp > 0 ? " at " + root.cpuTemp + " °C" : ""),
+                     "Memory " + root.memTip]
+        if (root.gpuPercent >= 0) lines.push("GPU " + root.gpuPercent + "%" + (root.gpuTemp > 0 ? " at " + root.gpuTemp + " °C" : ""))
+        if (root.diskPercent >= 0) lines.push("Disk " + root.diskTip)
+        lines.push("Click for Activity; right-click for its processes")
+        return lines.join("\n")
+      }
       onPressed: function(b) {
         root.run(b === Qt.RightButton ? "nyx-activity --section processes" : "nyx-activity --toggle")
       }
@@ -207,12 +233,76 @@ BarWidget {
 
   FileView { id: stat; path: "/proc/stat"; watchChanges: false; printErrors: false; onLoaded: root.readCpu(text()) }
   FileView { id: meminfo; path: "/proc/meminfo"; watchChanges: false; printErrors: false; onLoaded: root.readMemory(text()) }
+  FileView {
+    id: cpuTempFile; path: root.cpuTempPath; watchChanges: false; printErrors: false
+    onLoaded: { var v = Number(String(text()).trim()) / 1000; root.cpuTemp = isFinite(v) && v > 0 ? Math.round(v) : -1 }
+  }
+  FileView {
+    id: gpuBusyFile; path: root.gpuBusyPath; watchChanges: false; printErrors: false
+    onLoaded: { var v = Number(String(text()).trim()); root.gpuPercent = isFinite(v) && v >= 0 ? Math.round(Math.min(v, 100)) : -1 }
+  }
+  FileView {
+    id: gpuTempFile; path: root.gpuTempPath; watchChanges: false; printErrors: false
+    onLoaded: { var v = Number(String(text()).trim()) / 1000; root.gpuTemp = isFinite(v) && v > 0 ? Math.round(v) : -1 }
+  }
   Timer {
     interval: 3000
     repeat: true
     running: root.setting("system", true)
     triggeredOnStart: true
-    onTriggered: { stat.reload(); meminfo.reload() }
+    onTriggered: {
+      stat.reload(); meminfo.reload()
+      if (root.cpuTempPath !== "" && root.setting("temperature", true)) cpuTempFile.reload()
+      if (root.gpuBusyPath !== "" && root.setting("gpu", true)) gpuBusyFile.reload()
+      if (root.gpuTempPath !== "" && root.setting("gpu", true)) gpuTempFile.reload()
+    }
+  }
+
+  // Where the sensors are (once).
+  Process {
+    running: true
+    command: ["bash", "-c",
+      "for h in /sys/class/hwmon/hwmon*; do n=$(cat $h/name 2>/dev/null); case $n in coretemp|k10temp|zenpower) " +
+      "for l in $h/temp*_label; do case $(cat $l) in 'Package id 0'|Tctl) echo cpu ${l%_label}_input; break 2;; esac; done; " +
+      "echo cpu $h/temp1_input; break;; esac; done; " +
+      "for c in /sys/class/drm/card[0-9]; do d=$c/device; [ -r $d/gpu_busy_percent ] && echo busy $d/gpu_busy_percent; " +
+      "for t in $d/hwmon/hwmon*/temp1_input $d/hwmon/hwmon*/temp2_input; do [ -r $t ] && [ -r $d/gpu_busy_percent ] && echo gputemp $t && break; done; done"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var lines = String(text).split("\n")
+        for (var i = 0; i < lines.length; i++) {
+          var f = lines[i].split(" ")
+          if (f[0] === "cpu" && root.cpuTempPath === "") root.cpuTempPath = f[1]
+          if (f[0] === "busy" && root.gpuBusyPath === "") root.gpuBusyPath = f[1]
+          if (f[0] === "gputemp" && root.gpuTempPath === "") root.gpuTempPath = f[1]
+        }
+      }
+    }
+  }
+
+  // How full the root disk is, once a minute.
+  Process {
+    id: diskPoll
+    command: ["df", "-P", "-B1", "/"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var f = String(text).trim().split("\n").pop().split(/\s+/)
+        var used = Number(f[2]), total = Number(f[1])
+        if (total > 0) {
+          root.diskPercent = Math.round(100 * used / total)
+          root.diskTip = (used / 1e9).toFixed(0) + " of " + (total / 1e9).toFixed(0) + " GB used"
+        }
+      }
+    }
+  }
+  Timer {
+    interval: 60000
+    repeat: true
+    running: root.setting("system", true) && root.setting("disk", false)
+    triggeredOnStart: true
+    onTriggered: diskPoll.running = true
   }
 
   Process {

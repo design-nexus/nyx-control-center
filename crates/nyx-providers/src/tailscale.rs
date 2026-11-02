@@ -43,6 +43,8 @@ pub struct State {
     /// Everyone else, online first, then by name.
     pub peers: Vec<Machine>,
     pub accounts: Vec<Account>,
+    /// Omarchy's Taildrop receiver is running (files sent here land in Downloads).
+    pub receiving: bool,
 }
 
 impl State {
@@ -95,6 +97,7 @@ pub fn parse_status(json: &str) -> Option<State> {
         me: machine(&v["Self"]),
         peers,
         accounts: Vec::new(),
+        receiving: false,
     })
 }
 
@@ -145,6 +148,7 @@ pub fn refresh(set: Setter<State>) {
         if let Some(list) = output(&["tailscale", "switch", "--list"]).await {
             st.accounts = parse_accounts(&list);
         }
+        st.receiving = output(&["systemctl", "--user", "is-active", RECEIVER]).await.is_some_and(|s| s.trim() == "active");
         set.set(st);
     });
 }
@@ -169,6 +173,13 @@ pub async fn set_exit(ip: Option<&str>) -> Result<(), String> {
 pub async fn set_advertise_exit(on: bool) -> Result<(), String> {
     let arg = format!("--advertise-exit-node={on}");
     act(&["tailscale", "set", &arg]).await
+}
+
+const RECEIVER: &str = "omarchy-tailscale-receive.service";
+
+/// Save files sent to this machine (Taildrop) to Downloads, now and at login, or not.
+pub async fn set_receiving(on: bool) -> Result<(), String> {
+    act(&["systemctl", "--user", if on { "enable" } else { "disable" }, "--now", RECEIVER]).await
 }
 
 pub async fn switch(account_id: &str) -> Result<(), String> {

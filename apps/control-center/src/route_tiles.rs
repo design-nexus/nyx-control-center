@@ -150,6 +150,23 @@ pub fn tailscale_view(back: Rc<dyn Fn()>) -> gtk::Widget {
         r.append(&row_button("edit-copy-symbolic", "Copy this machine's Tailscale address", move || copy(&ip2)));
         r.append(&row_button("insert-link-symbolic", "Copy this machine's Tailscale name", move || copy(&dns)));
         c.append(&r);
+        // Files other machines send here (Omarchy's Taildrop receiver).
+        let r = row("document-save-symbolic", "Receive files", Some("Files sent to this machine are saved to Downloads"));
+        r.append(&row_button("folder-download-symbolic", "Open Downloads", || {
+            let dir =
+                glib::user_special_dir(glib::UserDirectory::Downloads).unwrap_or_else(|| glib::home_dir().join("Downloads"));
+            ui::launch(&["xdg-open", &dir.to_string_lossy()]);
+        }));
+        let s = gtk::Switch::new();
+        s.set_valign(gtk::Align::Center);
+        s.set_active(st.receiving);
+        s.set_tooltip_text(Some("Save files sent here (Taildrop), now and at login"));
+        s.connect_state_set(|_, on| {
+            act(tailscale::set_receiving(on));
+            glib::Propagation::Proceed
+        });
+        r.append(&s);
+        c.append(&r);
         b.append(&c);
 
         // Exit node.
@@ -379,6 +396,7 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
     let open_country: Rc<RefCell<Option<String>>> = Rc::default();
     let cities: Rc<RefCell<std::collections::HashMap<String, Vec<String>>>> = Rc::default();
     let technology: Rc<RefCell<Option<String>>> = Rc::default();
+    let protocol: Rc<RefCell<Option<String>>> = Rc::default();
     let tor_exits: Rc<RefCell<Option<ExitCountries>>> = Rc::default();
     let show_exits = Rc::new(std::cell::Cell::new(false));
     let latency: Rc<RefCell<Option<String>>> = Rc::default();
@@ -387,6 +405,7 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
     let slot: Rc<RefCell<Option<Draw>>> = Rc::default();
     let b = body.clone();
     let (cs, ss, sc, sl) = (countries.clone(), settings.clone(), show_countries.clone(), slot.clone());
+    let proto = protocol.clone();
     let (oc, ci, tech, tx, sx, lat, br) = (
         open_country.clone(),
         cities.clone(),
@@ -619,6 +638,40 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
                     b.connect_clicked(move |_| {
                         *t2.borrow_mut() = Some(id.to_string());
                         act(routes::nord_set_value("technology", id));
+                        rd2();
+                    });
+                    seg.append(&b);
+                }
+                seg.set_valign(gtk::Align::Center);
+                r.append(&seg);
+                c.append(&r);
+            }
+            // UDP or TCP: OpenVPN only (NordLynx and NordWhisper choose their own).
+            if current == "OPENVPN" {
+                if proto.borrow().is_none() {
+                    *proto.borrow_mut() = Some(String::new());
+                    let (p2, rd2) = (proto.clone(), redraw.clone());
+                    glib::MainContext::default().spawn_local(async move {
+                        *p2.borrow_mut() = Some(routes::nord_protocol().await.unwrap_or_default());
+                        rd2();
+                    });
+                }
+                let cur = proto.borrow().clone().unwrap_or_default();
+                let r = row(
+                    "network-transmit-receive-symbolic",
+                    "Protocol",
+                    Some("TCP gets through stricter networks; UDP is faster"),
+                );
+                let seg = gtk::Box::new(gtk::Orientation::Horizontal, 2);
+                seg.add_css_class("cc-segmented");
+                seg.add_css_class("cc-small-choice");
+                for (id, arg) in [("UDP", "udp"), ("TCP", "tcp")] {
+                    let b = gtk::ToggleButton::with_label(id);
+                    b.set_active(cur == id);
+                    let (p2, rd2) = (proto.clone(), redraw.clone());
+                    b.connect_clicked(move |_| {
+                        *p2.borrow_mut() = Some(id.to_string());
+                        act(routes::nord_set_value("protocol", arg));
                         rd2();
                     });
                     seg.append(&b);

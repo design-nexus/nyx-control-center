@@ -279,6 +279,12 @@ pub async fn nord_technology() -> Option<String> {
     t.lines().find_map(|l| l.strip_prefix("Technology:").map(|v| v.trim().to_uppercase()))
 }
 
+/// NordVPN's protocol (`UDP`, `TCP`): only for the OpenVPN technology.
+pub async fn nord_protocol() -> Option<String> {
+    let t = output(&["nordvpn", "settings"]).await?;
+    t.lines().find_map(|l| l.strip_prefix("Protocol:").map(|v| v.trim().to_uppercase())).filter(|p| p == "UDP" || p == "TCP")
+}
+
 /// The countries Tor has exit relays in, most relays first: `(code, relays)`. Slow (it
 /// asks Tor about every relay); only while Tor runs.
 pub async fn tor_exit_countries() -> Vec<(String, usize)> {

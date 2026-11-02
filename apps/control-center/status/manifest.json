@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "design-nexus.status",
   "name": "Nyx Status",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Ken",
   "license": "MIT",
   "description": "Temperature, CPU and memory use, and the network, Bluetooth, sound and battery at a glance; clicks open the Nyx Control Center.",
@@ -21,6 +21,9 @@
     "defaults": {
       "weather": true,
       "system": true,
+      "temperature": true,
+      "gpu": true,
+      "disk": false,
       "network": true,
       "bluetooth": true,
       "sound": true,
@@ -30,6 +33,9 @@
     "schema": [
       { "key": "weather", "type": "boolean", "label": "Weather", "description": "Current conditions and temperature from Nyx Weather.", "defaultValue": true },
       { "key": "system", "type": "boolean", "label": "CPU and memory", "defaultValue": true },
+      { "key": "temperature", "type": "boolean", "label": "CPU temperature", "defaultValue": true },
+      { "key": "gpu", "type": "boolean", "label": "GPU use and temperature", "description": "Where the graphics driver publishes them (AMD, Intel Xe).", "defaultValue": true },
+      { "key": "disk", "type": "boolean", "label": "Disk space used", "defaultValue": false },
       { "key": "network", "type": "boolean", "label": "Network", "defaultValue": true },
       { "key": "bluetooth", "type": "boolean", "label": "Bluetooth", "defaultValue": true },
       { "key": "sound", "type": "boolean", "label": "Sound", "defaultValue": true },
