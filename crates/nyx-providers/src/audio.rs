@@ -1,5 +1,6 @@
-//! Sound output through PipeWire's PulseAudio service (`pactl`): the default output's
-//! volume, the outputs to choose from, and each app's own volume. `pactl subscribe`
+//! Sound through PipeWire's PulseAudio service (`pactl`): the default output's volume,
+//! the outputs to choose from and each app's own volume; the microphone's level and
+//! mute, the inputs to choose from, and which apps are recording. `pactl subscribe`
 //! says when something changed.
 
 use crate::{Debounce, Watch, output, run};
@@ -34,11 +35,22 @@ pub struct State {
     pub muted: bool,
     pub outputs: Vec<Output>,
     pub streams: Vec<Stream>,
+    /// The default microphone's level, 0.0–1.5.
+    pub mic_volume: f64,
+    pub mic_muted: bool,
+    /// Microphones and other inputs (not the monitors of outputs).
+    pub inputs: Vec<Output>,
+    /// Apps recording from a microphone now.
+    pub recording: Vec<String>,
 }
 
 impl State {
     pub fn current(&self) -> Option<&Output> {
         self.outputs.iter().find(|o| o.default)
+    }
+
+    pub fn current_input(&self) -> Option<&Output> {
+        self.inputs.iter().find(|o| o.default)
     }
 }
 
@@ -54,8 +66,8 @@ fn start(set: Setter<State>) -> Box<dyn Stop> {
     refresh(set.clone());
     let debounce = Debounce::new(60);
     Box::new(Watch::lines(&["pactl", "subscribe"], move |line| {
-        // Only sinks, sink inputs and the server (default changes) matter here.
-        if line.contains("sink") || line.contains("server") {
+        // Sinks, sources, their streams and the server (default changes).
+        if line.contains("sink") || line.contains("source") || line.contains("server") {
             let s = set.clone();
             debounce.call(move || refresh(s));
         }
@@ -71,7 +83,12 @@ pub fn refresh(set: Setter<State>) {
             set.set(State::default());
             return;
         };
-        set.set(parse(default.trim(), &sinks, &inputs));
+        let mut st = parse(default.trim(), &sinks, &inputs);
+        let default_source = output(&["pactl", "get-default-source"]).await.unwrap_or_default();
+        let sources = output(&["pactl", "-f", "json", "list", "sources"]).await.unwrap_or_default();
+        let recording = output(&["pactl", "-f", "json", "list", "source-outputs"]).await.unwrap_or_default();
+        parse_inputs(&mut st, default_source.trim(), &sources, &recording);
+        set.set(st);
     });
 }
 
@@ -141,6 +158,57 @@ pub fn parse(default: &str, sinks: &str, inputs: &str) -> State {
     st
 }
 
+/// Add the microphones from `pactl -f json list sources` and the apps recording from
+/// `… source-outputs`.
+pub fn parse_inputs(st: &mut State, default: &str, sources: &str, outputs: &str) {
+    let sources: Vec<Value> = serde_json::from_str(sources).unwrap_or_default();
+    for s in &sources {
+        let props = s.get("properties").cloned().unwrap_or(Value::Null);
+        // Every output has a "monitor" source; those aren't microphones.
+        if props.get("device.class").and_then(Value::as_str) == Some("monitor") {
+            continue;
+        }
+        let name = s.get("name").and_then(Value::as_str).unwrap_or("").to_string();
+        let is_default = name == default;
+        if is_default {
+            st.mic_volume = s.get("volume").map(percent).unwrap_or(0.0);
+            st.mic_muted = s.get("mute").and_then(Value::as_bool).unwrap_or(false);
+        }
+        let bt = props.get("device.bus").and_then(Value::as_str) == Some("bluetooth");
+        st.inputs.push(Output {
+            description: s.get("description").and_then(Value::as_str).unwrap_or(&name).to_string(),
+            kind: if bt { "headset".into() } else { "microphone".into() },
+            default: is_default,
+            name,
+        });
+    }
+    let outs: Vec<Value> = serde_json::from_str(outputs).unwrap_or_default();
+    for o in &outs {
+        let props = o.get("properties").cloned().unwrap_or(Value::Null);
+        let get = |k: &str| props.get(k).and_then(Value::as_str).unwrap_or("").to_string();
+        // Peak meters (pavucontrol, the shell's level bars) aren't recording.
+        if get("stream.monitor") == "true" || get("application.id") == "org.PulseAudio.pavucontrol" {
+            continue;
+        }
+        let app = get("application.name");
+        if !app.is_empty() && !st.recording.contains(&app) {
+            st.recording.push(app);
+        }
+    }
+}
+
+pub async fn set_mic_volume(v: f64) -> Result<(), String> {
+    run(&["pactl", "set-source-volume", "@DEFAULT_SOURCE@", &pct(v)], None).await
+}
+
+pub async fn set_mic_muted(muted: bool) -> Result<(), String> {
+    run(&["pactl", "set-source-mute", "@DEFAULT_SOURCE@", if muted { "1" } else { "0" }], None).await
+}
+
+pub async fn set_input(name: &str) -> Result<(), String> {
+    run(&["pactl", "set-default-source", name], None).await
+}
+
 fn pct(v: f64) -> String {
     format!("{}%", (v.clamp(0.0, 1.5) * 100.0).round() as u32)
 }
@@ -189,6 +257,22 @@ mod tests {
         assert!((parse("alsa_output.analog", SINKS, "[]").volume - 0.42).abs() < 1e-9, "the loudest channel");
         assert_eq!(st.streams.len(), 1, "event sounds left out");
         assert_eq!(st.streams[0].binary, "firefox");
+    }
+
+    #[test]
+    fn reads_microphones() {
+        let mut st = State::default();
+        parse_inputs(
+            &mut st,
+            "alsa_input.analog",
+            r#"[{"name":"alsa_output.analog.monitor","description":"Monitor of Built-in","properties":{"device.class":"monitor"}},
+                {"name":"alsa_input.analog","description":"Built-in Mic","mute":true,"volume":{"mono":{"value_percent":"55%"}},
+                 "properties":{"device.class":"sound","device.bus":"pci"}}]"#,
+            r#"[{"properties":{"application.name":"Firefox"}},{"properties":{"application.name":"Shell","stream.monitor":"true"}}]"#,
+        );
+        assert_eq!(st.inputs.len(), 1, "monitors aren't microphones");
+        assert!(st.mic_muted && (st.mic_volume - 0.55).abs() < 1e-9);
+        assert_eq!(st.recording, vec!["Firefox"], "level meters aren't recording");
     }
 
     #[test]

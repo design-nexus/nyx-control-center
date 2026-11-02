@@ -31,6 +31,7 @@ pub enum Detail {
     Bluetooth,
     Vpn,
     Tailscale,
+    Display,
 }
 
 impl Detail {
@@ -40,6 +41,7 @@ impl Detail {
             "bluetooth" => Some(Detail::Bluetooth),
             "vpn" => Some(Detail::Vpn),
             "tailscale" => Some(Detail::Tailscale),
+            "display" => Some(Detail::Display),
             _ => None,
         }
     }
@@ -103,6 +105,13 @@ pub fn kinds() -> Vec<Kind> {
             build: power_tile,
         },
         Kind { id: "battery", name: "Battery", icon: "battery-good-symbolic", sizes: &[S::S1X1, S::S2X1], build: battery },
+        Kind {
+            id: "microphone",
+            name: "Microphone",
+            icon: "audio-input-microphone-symbolic",
+            sizes: &[S::S1X1],
+            build: microphone,
+        },
         Kind { id: "night-light", name: "Night light", icon: "night-light-symbolic", sizes: &[S::S1X1], build: night_light },
         Kind {
             id: "keep-awake",
@@ -353,6 +362,34 @@ fn dnd(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     tile.upcast()
 }
 
+/// Mute the microphone; red while an app is recording.
+fn microphone(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
+    let (tile, chip_box, chip_icon, _) = toggle(size, "audio-input-microphone-symbolic", "Microphone", || {
+        act(audio::set_mic_muted(!audio::live().get().mic_muted))
+    });
+    tint(&tile, "coral");
+    let t = tile.clone();
+    bind(&tile, audio::live(), move |st| {
+        let live = !st.mic_muted && !st.recording.is_empty();
+        // On (coloured) while it can hear; muted shows the crossed-out icon.
+        on(&chip_box, !st.mic_muted);
+        set_class(&t, "tint-red", live);
+        set_class(&t, "tint-coral", !live);
+        chip_icon.set_icon_name(Some(if st.mic_muted {
+            "microphone-sensitivity-muted-symbolic"
+        } else {
+            "audio-input-microphone-symbolic"
+        }));
+        t.set_tooltip_text(Some(&match (st.mic_muted, st.recording.is_empty()) {
+            (true, _) => "The microphone is muted. Click to unmute".to_string(),
+            (false, true) => format!("Microphone on ({}%). Click to mute", (st.mic_volume * 100.0).round()),
+            (false, false) => format!("Recording now: {}. Click to mute the microphone", st.recording.join(", ")),
+        }));
+        t.set_visible(!st.inputs.is_empty());
+    });
+    tile.upcast()
+}
+
 fn night_light(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     let (tile, chip_box, _, status) = toggle(size, "night-light-symbolic", "Night light", || act(omarchy::toggle_night_light()));
     tint(&tile, "coral");
@@ -481,7 +518,7 @@ fn keyboard_light(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
 
 // ---------- Sound and brightness ----------
 
-fn sound(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
+fn sound(ctx: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     let tile = frame(size);
     tile.add_css_class("cc-sliders");
     // Each slider gets half the tile, so the space above and below them is equal.
@@ -494,10 +531,10 @@ fn sound(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     vrow.append(&out);
     tile.append(&vrow);
     let (brow, bbutton, bscale, bvalue) =
-        ui::slider("display-brightness-symbolic", "Display settings: resolution, scale, arrangement");
+        ui::slider("display-brightness-symbolic", "Screens: brightness of each, scale, text size");
     brow.add_css_class("tint-amber");
     bscale.set_range(0.01, 1.0);
-    let screens = icon_button("video-display-symbolic", "Display settings");
+    let screens = icon_button("video-display-symbolic", "Screens: brightness of each, scale, text size");
     brow.append(&screens);
     tile.append(&brow);
 
@@ -523,8 +560,10 @@ fn sound(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     });
     out.connect_clicked(|_| act(audio::set_muted(!audio::live().get().muted)));
     vbutton.connect_clicked(crate::details::volume_popover);
-    bbutton.connect_clicked(|_| ui::open_settings("displays"));
-    screens.connect_clicked(|_| ui::open_settings("displays"));
+    let o = ctx.open.clone();
+    bbutton.connect_clicked(move |_| o(Detail::Display));
+    let o = ctx.open.clone();
+    screens.connect_clicked(move |_| o(Detail::Display));
 
     let (p, vs, vv, o, vb, vr) = (pushing.clone(), vscale.clone(), vvalue.clone(), out.clone(), vbutton.clone(), vrow.clone());
     bind(&tile, audio::live(), move |st| {

@@ -798,3 +798,33 @@ window.nyx-control-center button.cc-row-button {
 window.nyx-control-center .cc-row.cc-dim {
   opacity: 0.55;
 }
+
+window.nyx-control-center .cc-recording {
+  color: @cc_red;
+  padding: 4px 8px 2px;
+}
+
+/* Connection details: two columns of small facts. */
+window.nyx-control-center .cc-facts {
+  padding: 8px 10px;
+}
+
+window.nyx-control-center .cc-fact-name {
+  font-size: 11px;
+  color: @theme_text_tertiary;
+}
+
+window.nyx-control-center .cc-fact-value {
+  font-size: 12.5px;
+  font-feature-settings: "tnum";
+}
+
+window.nyx-control-center .cc-slider-caption {
+  padding: 4px 8px 0;
+}
+
+window.nyx-control-center .cc-scale-choice button {
+  min-height: 28px;
+  font-size: 12px;
+  font-feature-settings: "tnum";
+}
