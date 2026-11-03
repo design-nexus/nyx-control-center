@@ -132,3 +132,6 @@ cargo test --locked --workspace
 ## License
 
 MIT
+
+
+Backup tile: consumes Nyx Backup 0.6.0’s sender-bound Core Control grants. Add Backup in the widget picker, then grant `io.github.design_nexus.nyx.ControlCenter` status and optional backup/cancel actions in Backup Settings. The provider polls only while visible; it does not auto-start Backup. See [Backup ecosystem contract](https://github.com/design-nexus/nyx-backup/blob/main/docs/ECOSYSTEM.md). Headless contract/subscription qualification uses `nyx-providers --example backup_probe` against an isolated fixture, not a GUI launch.

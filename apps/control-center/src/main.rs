@@ -5,6 +5,7 @@
 //! `--toggle wifi | bluetooth | vpn` opens it on that list.
 //! `--only <output>` keeps it on one output (for trying it on a test output).
 
+mod backup_tile;
 mod details;
 mod home_tile;
 mod panel;

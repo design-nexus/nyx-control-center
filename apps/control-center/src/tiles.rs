@@ -66,6 +66,13 @@ pub struct Kind {
 pub fn kinds() -> Vec<Kind> {
     use Size as S;
     vec![
+        Kind {
+            id: "backup",
+            name: "Backup",
+            icon: "drive-harddisk-symbolic",
+            sizes: &[S::S2X3, S::S4X3],
+            build: crate::backup_tile::build,
+        },
         Kind { id: "wifi", name: "Wi-Fi", icon: "network-wireless-symbolic", sizes: &[S::S2X1, S::S1X1], build: wifi },
         Kind {
             id: "bluetooth",

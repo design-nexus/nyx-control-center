@@ -205,3 +205,5 @@ mod tests {
         assert_eq!(terse_fields("a\\\\b:c"), vec!["a\\b", "c"]);
     }
 }
+
+pub mod backup;
