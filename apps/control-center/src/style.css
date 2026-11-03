@@ -916,11 +916,11 @@ window.nyx-control-center .cc-value.loud {
 
 /* Keyboard light: a pip per level. */
 window.nyx-control-center .cc-pips {
-  margin-bottom: 6px;
+  margin-right: 2px;
 }
 
 window.nyx-control-center .cc-pip {
-  min-width: 8px;
+  min-width: 7px;
   min-height: 3px;
   border-radius: 2px;
   background: alpha(@theme_text, 0.18);

@@ -511,11 +511,17 @@ fn keyboard_light(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
         }
     });
     tint(&tile, "teal");
-    // One pip per level the light has, lit up to the current one.
-    let pips = gtk::Box::new(gtk::Orientation::Horizontal, 3);
+    // The level beside the icon, not under it, so the icon sits where every other
+    // toggle's does: a small meter, a bar per level stacked upward, lit to the current.
+    let pips = gtk::Box::new(gtk::Orientation::Vertical, 2);
     pips.add_css_class("cc-pips");
-    pips.set_halign(gtk::Align::Center);
-    tile.append(&pips);
+    pips.set_valign(gtk::Align::Center);
+    tile.remove(&chip_box);
+    let centre = gtk::CenterBox::new();
+    centre.set_vexpand(true);
+    centre.set_center_widget(Some(&chip_box));
+    centre.set_end_widget(Some(&pips));
+    tile.append(&centre);
     let t = tile.clone();
     bind(&tile, brightness::live(), move |st| {
         t.set_visible(st.keyboard.is_some() || st.screen.is_none());
@@ -524,7 +530,8 @@ fn keyboard_light(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
         while let Some(c) = pips.first_child() {
             pips.remove(&c);
         }
-        for i in 1..=max.min(5) {
+        // Top bar first: the highest level at the top.
+        for i in (1..=max.min(5)).rev() {
             let p = gtk::Box::new(gtk::Orientation::Horizontal, 0);
             p.add_css_class("cc-pip");
             set_class(&p, "lit", i <= step);
