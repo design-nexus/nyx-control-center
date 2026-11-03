@@ -288,6 +288,8 @@ pub fn tailscale_view(back: Rc<dyn Fn()>) -> gtk::Widget {
 
 // ---------------------------------------------------------------- VPN
 
+/// Refills the location list.
+type Refill = Rc<dyn Fn()>;
 /// NordVPN's switches, as `(name, on)`.
 type NordSettings = Vec<(String, bool)>;
 /// Tor's exit countries, as `(code, relays)`.
@@ -418,7 +420,7 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
     let fill: Rc<dyn Fn()> = {
         let (list, search, open_service, places, cities, open_country) =
             (list.clone(), search.clone(), open_service.clone(), places.clone(), cities.clone(), open_country.clone());
-        let slot_fill: Rc<RefCell<Option<Rc<dyn Fn()>>>> = Rc::default();
+        let slot_fill: Rc<RefCell<Option<Refill>>> = Rc::default();
         let sf = slot_fill.clone();
         let f: Rc<dyn Fn()> = Rc::new(move || {
             clear(&list);
