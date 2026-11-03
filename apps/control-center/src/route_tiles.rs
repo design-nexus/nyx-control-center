@@ -537,10 +537,10 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
             r.set_visible(has_places);
             c.append(&r);
             if sc.get() && has_places {
-                if let Some(p) = srch.parent() {
-                    if let Ok(pb) = p.downcast::<gtk::Box>() {
-                        pb.remove(&srch);
-                    }
+                if let Some(p) = srch.parent()
+                    && let Ok(pb) = p.downcast::<gtk::Box>()
+                {
+                    pb.remove(&srch);
                 }
                 c.append(&srch);
                 let query = srch.text().to_lowercase();
