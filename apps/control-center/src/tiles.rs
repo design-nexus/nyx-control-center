@@ -513,7 +513,7 @@ fn keyboard_light(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     tint(&tile, "teal");
     // The level beside the icon, not under it, so the icon sits where every other
     // toggle's does: a small meter, a bar per level stacked upward, lit to the current.
-    let pips = gtk::Box::new(gtk::Orientation::Vertical, 3);
+    let pips = gtk::Box::new(gtk::Orientation::Vertical, 5);
     pips.add_css_class("cc-pips");
     pips.set_valign(gtk::Align::Center);
     tile.remove(&chip_box);
