@@ -126,9 +126,9 @@ pub fn file_icon(uri: &str) -> gio::Icon {
     gio::FileIcon::new(&gio::File::for_uri(uri)).upcast()
 }
 
-/// A CSS class drawing an event in its calendar's colour, as Nyx Calendar's week view
-/// does: the colour at a fifth over the card, a faint edge in it, the title tinted
-/// toward it. Rules are added once per colour.
+/// A CSS class drawing an event in its calendar's colour, subtly (as the Wi-Fi and
+/// Bluetooth tiles tint when on): the colour at 13 % over the card, a faint edge in it,
+/// the text only lightly tinted. Rules are added once per colour.
 pub fn event_class(hex: &str) -> String {
     use std::collections::BTreeSet;
     thread_local!(static DONE: RefCell<(Option<gtk::CssProvider>, BTreeSet<String>)> = RefCell::default());
@@ -147,9 +147,9 @@ pub fn event_class(hex: &str) -> String {
             .iter()
             .map(|h| {
                 format!(
-                    "window.nyx-control-center .cc-event.cc-ev-{h} {{ background: mix(@theme_card, #{h}, 0.20); border: 1px solid alpha(#{h}, 0.28); }}\n\
-                     window.nyx-control-center .cc-event.cc-ev-{h} .cc-event-title {{ color: mix(@theme_text, #{h}, 0.45); }}\n\
-                     window.nyx-control-center .cc-event.cc-ev-{h} .cc-event-when {{ color: alpha(mix(@theme_text, #{h}, 0.45), 0.8); }}\n"
+                    "window.nyx-control-center .cc-event.cc-ev-{h} {{ background: mix(@theme_card, #{h}, 0.13); border: 1px solid alpha(#{h}, 0.16); }}\n\
+                     window.nyx-control-center .cc-event.cc-ev-{h} .cc-event-title {{ color: mix(@theme_text, #{h}, 0.22); }}\n\
+                     window.nyx-control-center .cc-event.cc-ev-{h} .cc-event-when {{ color: alpha(mix(@theme_text, #{h}, 0.22), 0.7); }}\n"
                 )
             })
             .collect();

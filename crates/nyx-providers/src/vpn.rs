@@ -110,7 +110,9 @@ pub fn parse_nm(text: &str) -> Vec<Service> {
             let f = crate::terse_fields(l);
             let (name, uuid, kind, active) = (f.first()?, f.get(1)?, f.get(2)?, f.get(3)?);
             let wireguard = kind == "wireguard";
-            if !(wireguard || kind == "vpn") || name.to_lowercase().contains("tailscale") {
+            // Tailscale's and NordVPN's own tunnels aren't services of their own.
+            let lower = name.to_lowercase();
+            if !(wireguard || kind == "vpn") || lower.contains("tailscale") || lower == "nordlynx" {
                 return None;
             }
             Some(Service {
@@ -174,6 +176,30 @@ async fn read_state() -> State {
         services.extend(parse_nm(&t));
     }
     State { services }
+}
+
+/// The VPN the Control Center shows: the one picked in Settings › Online Accounts › VPN
+/// (`default = "nord"` in `~/.config/nyx/vpn.toml`), else the first set up.
+pub fn config_path() -> std::path::PathBuf {
+    glib::user_config_dir().join("nyx/vpn.toml")
+}
+
+pub fn chosen_id() -> Option<String> {
+    let text = std::fs::read_to_string(config_path()).ok()?;
+    text.lines().find_map(|l| {
+        let (k, v) = l.split_once('=')?;
+        (k.trim() == "default").then(|| v.trim().trim_matches('"').to_string())
+    })
+}
+
+pub fn pick_default(services: &[Service], chosen: Option<&str>) -> Option<Service> {
+    chosen.and_then(|id| services.iter().find(|s| s.id == id)).or(services.first()).cloned()
+}
+
+/// The default VPN, read now.
+pub async fn default_service() -> Option<Service> {
+    let st = read_state().await;
+    pick_default(&st.services, chosen_id().as_deref())
 }
 
 thread_local! {
@@ -431,6 +457,15 @@ mod tests {
         assert_eq!(s.len(), 2);
         assert_eq!(s[0].kind, Kind::Nm { uuid: "bbb".into(), wireguard: true });
         assert!(s[1].connected);
+    }
+
+    #[test]
+    fn picks_the_default() {
+        let s = parse_nm("wg-a:aaa:wireguard:no\nwg-b:bbb:wireguard:no\nnordlynx:ccc:wireguard:yes\n");
+        assert_eq!(s.len(), 2, "NordVPN's own tunnel isn't a service");
+        assert_eq!(pick_default(&s, Some("nm:bbb")).unwrap().name, "wg-b");
+        assert_eq!(pick_default(&s, Some("gone")).unwrap().name, "wg-a", "the first when the chosen one is gone");
+        assert!(pick_default(&[], None).is_none());
     }
 
     #[test]

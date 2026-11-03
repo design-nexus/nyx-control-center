@@ -10,9 +10,14 @@ use crate::{TimerStop, output, run};
 use nyx_widgets::live::{Live, Setter, Stop};
 use std::time::Duration;
 
+/// The default VPN (see [`crate::vpn::default_service`]). Named `Nord` as it was
+/// NordVPN's first; it describes whichever service is the default.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Nord {
     pub installed: bool,
+    /// "NordVPN", "Mullvad", a connection's name…
+    pub name: String,
+    pub service: Option<crate::vpn::Service>,
     /// `Connected`, `Disconnected`, `Connecting`…
     pub status: String,
     pub country: String,
@@ -171,9 +176,27 @@ fn start(set: Setter<State>) -> Box<dyn Stop> {
 
 pub fn refresh(set: Setter<State>) {
     glib::MainContext::default().spawn_local(async move {
-        let nord = match output(&["nordvpn", "status"]).await {
-            Some(t) => parse_nord(&t),
-            None => Nord { installed: crate::present("nordvpn"), ..Default::default() },
+        let nord = match crate::vpn::default_service().await {
+            None => Nord::default(),
+            Some(svc) if svc.kind == crate::vpn::Kind::Nord => {
+                let mut n = output(&["nordvpn", "status"]).await.map(|t| parse_nord(&t)).unwrap_or_default();
+                n.installed = true;
+                n.name = svc.name.clone();
+                n.service = Some(svc);
+                n
+            }
+            Some(svc) => {
+                let mut parts = svc.location.splitn(2, ", ");
+                Nord {
+                    installed: true,
+                    name: svc.name.clone(),
+                    status: if svc.connected { "Connected".into() } else { "Disconnected".into() },
+                    country: parts.next().unwrap_or("").to_string(),
+                    city: parts.next().unwrap_or("").to_string(),
+                    service: Some(svc),
+                    ..Default::default()
+                }
+            }
         };
         let tor = output(&["tormarchy", "status", "--json"]).await.and_then(|t| parse_tor(&t)).unwrap_or_default();
         set.set(State { nord, tor });
@@ -197,21 +220,16 @@ pub async fn direct() -> Result<(), String> {
     done(Ok(())).await
 }
 
-/// NordVPN, to the fastest server or one in `place` (a country or city, `_` for spaces).
+/// The default VPN, to its fastest place or `place`.
 pub async fn nord(place: Option<&str>) -> Result<(), String> {
-    let st = live().get();
-    if st.tor.routing() {
-        run(&["tormarchy", "disconnect"], None).await?;
-    }
-    let mut args = vec!["nordvpn", "connect"];
-    if let Some(p) = place {
-        args.push(p);
-    }
-    done(run(&args, None).await).await
+    let Some(svc) = crate::vpn::default_service().await else { return Err("No VPN set up".into()) };
+    let r = crate::vpn::connect(&svc, place).await;
+    done(r).await
 }
 
 pub async fn nord_off() -> Result<(), String> {
-    done(run(&["nordvpn", "disconnect"], None).await).await
+    let Some(svc) = crate::vpn::default_service().await else { return Ok(()) };
+    done(crate::vpn::disconnect(&svc).await).await
 }
 
 /// A NordVPN setting: `killswitch`, `autoconnect`, `threatprotectionlite`… on or off.
