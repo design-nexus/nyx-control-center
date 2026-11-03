@@ -98,13 +98,7 @@ pub fn kinds() -> Vec<Kind> {
             build: sound,
         },
         Kind { id: "home", name: "Home", icon: "go-home-symbolic", sizes: &[S::S2X3, S::S4X3], build: crate::home_tile::build },
-        Kind {
-            id: "upcoming",
-            name: "Up next",
-            icon: "x-office-calendar-symbolic",
-            sizes: &[S::S4X2, S::S2X2, S::S4X3],
-            build: upcoming,
-        },
+        Kind { id: "upcoming", name: "Up next", icon: "x-office-calendar-symbolic", sizes: &[S::S4X3, S::S2X3], build: upcoming },
         Kind { id: "media", name: "Now playing", icon: "audio-x-generic-symbolic", sizes: &[S::S4X2], build: media_tile },
         Kind {
             id: "power",
@@ -166,7 +160,7 @@ pub fn default_pages() -> Vec<Page> {
                 t("capture", S::S1X1),
             ],
         },
-        Page { tiles: vec![t("upcoming", S::S4X2), t("microphone", S::S1X1), t("battery", S::S1X1), t("home", S::S4X3)] },
+        Page { tiles: vec![t("upcoming", S::S4X3), t("microphone", S::S1X1), t("battery", S::S1X1), t("home", S::S4X3)] },
     ]
 }
 
@@ -510,12 +504,27 @@ fn keyboard_light(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
         }
     });
     tint(&tile, "teal");
+    // One pip per level the light has, lit up to the current one.
+    let pips = gtk::Box::new(gtk::Orientation::Horizontal, 3);
+    pips.add_css_class("cc-pips");
+    pips.set_halign(gtk::Align::Center);
+    tile.append(&pips);
     let t = tile.clone();
     bind(&tile, brightness::live(), move |st| {
         t.set_visible(st.keyboard.is_some() || st.screen.is_none());
         let level = st.keyboard.as_ref().map_or(0.0, |k| k.value);
+        let (step, max) = st.keyboard.as_ref().map_or((0, 0), |k| ((k.value * k.max as f64).round() as u32, k.max));
+        while let Some(c) = pips.first_child() {
+            pips.remove(&c);
+        }
+        for i in 1..=max.min(5) {
+            let p = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+            p.add_css_class("cc-pip");
+            set_class(&p, "lit", i <= step);
+            pips.append(&p);
+        }
         t.set_tooltip_text(Some(&if level > 0.0 {
-            format!("Keyboard light at {}%. Click for the next level", (level * 100.0).round())
+            format!("Keyboard light at level {step} of {max}. Click for the next level")
         } else {
             "Keyboard light is off. Click to turn it on".to_string()
         }));
@@ -536,7 +545,6 @@ fn sound(ctx: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     let (vrow, vbutton, vscale, vvalue) = ui::slider("audio-volume-high-symbolic", "Sound: outputs and each app's volume");
     vrow.add_css_class("tint-blue");
     vscale.set_range(0.0, 1.5);
-    vscale.add_mark(1.0, gtk::PositionType::Bottom, None);
     let out = icon_button("audio-speakers-symbolic", "Mute");
     vrow.append(&out);
     tile.append(&vrow);
@@ -582,6 +590,8 @@ fn sound(ctx: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
         p.set(false);
         let pct = (st.volume * 100.0).round();
         vv.set_text(&if st.muted { "Off".into() } else { format!("{pct}%") });
+        // Past 100 % is amplified (it can distort): say so in colour.
+        set_class(&vv, "loud", !st.muted && pct > 100.0);
         vb.set_icon_name(match (st.muted, st.volume) {
             (true, _) => "audio-volume-muted-symbolic",
             (_, v) if v < 0.34 => "audio-volume-low-symbolic",
@@ -612,24 +622,62 @@ fn sound(ctx: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
 
 // ---------- Media, power, battery ----------
 
+/// "3:07", "1:02:45".
+fn clock(us: i64) -> String {
+    let s = (us / 1_000_000).max(0);
+    if s >= 3600 { format!("{}:{:02}:{:02}", s / 3600, (s / 60) % 60, s % 60) } else { format!("{}:{:02}", s / 60, s % 60) }
+}
+
+/// Now playing: the cover, what it is with a progress bar you can drag, and big
+/// controls on the right.
 fn media_tile(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     let tile = frame(size);
     tile.add_css_class("cc-media");
     tint(&tile, "pink");
-    let row = gtk::Box::new(gtk::Orientation::Horizontal, 14);
+    let row = gtk::Box::new(gtk::Orientation::Horizontal, 12);
     row.set_vexpand(true);
+    // The cover in an 80 px box; without one, a small note in the box.
+    let art_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+    art_box.add_css_class("cc-art-box");
+    art_box.set_size_request(80, 80);
+    art_box.set_valign(gtk::Align::Center);
+    art_box.set_overflow(gtk::Overflow::Hidden);
     let art = gtk::Image::new();
-    art.set_pixel_size(80);
-    art.add_css_class("cc-art");
+    art.set_hexpand(true);
+    art.set_halign(gtk::Align::Center);
     art.set_valign(gtk::Align::Center);
-    let text = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    art_box.append(&art);
+    // The image centres inside; the box itself takes no spare width.
+    art_box.set_hexpand(false);
+    art_box.set_halign(gtk::Align::Start);
+    row.append(&art_box);
+
+    let text = gtk::Box::new(gtk::Orientation::Vertical, 1);
     text.set_valign(gtk::Align::Center);
     text.set_hexpand(true);
     let title = label("", "cc-media-title");
-    let artist = label("", "cc-status");
-    let player = label("", "cc-media-player");
+    let artist = label("", "cc-media-artist");
+    text.append(&title);
+    text.append(&artist);
+    // Progress: drag to seek (when the player allows it).
+    let progress = gtk::Box::new(gtk::Orientation::Horizontal, 6);
+    progress.add_css_class("cc-media-progress");
+    let elapsed = gtk::Label::new(None);
+    elapsed.add_css_class("cc-media-time");
+    let bar = gtk::Scale::with_range(gtk::Orientation::Horizontal, 0.0, 1.0, 0.001);
+    bar.set_draw_value(false);
+    bar.set_hexpand(true);
+    let total = gtk::Label::new(None);
+    total.add_css_class("cc-media-time");
+    progress.append(&elapsed);
+    progress.append(&bar);
+    progress.append(&total);
+    text.append(&progress);
+    row.append(&text);
+
     let buttons = gtk::Box::new(gtk::Orientation::Horizontal, 4);
     buttons.add_css_class("cc-media-buttons");
+    buttons.set_valign(gtk::Align::Center);
     let prev = icon_button("media-skip-backward-symbolic", "Previous track");
     let play = icon_button("media-playback-start-symbolic", "Play");
     play.add_css_class("cc-play");
@@ -638,15 +686,59 @@ fn media_tile(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     play.connect_clicked(|_| media::command("PlayPause"));
     next.connect_clicked(|_| media::command("Next"));
     for b in [&prev, &play, &next] {
+        b.set_valign(gtk::Align::Center);
         buttons.append(b);
     }
-    text.append(&title);
-    text.append(&artist);
-    text.append(&player);
-    text.append(&buttons);
-    row.append(&art);
-    row.append(&text);
+    row.append(&buttons);
     tile.append(&row);
+
+    // Seeking: only a drag by the user moves the player.
+    let pushing = Rc::new(std::cell::Cell::new(false));
+    let p = pushing.clone();
+    let debounce = nyx_providers::Debounce::new(120);
+    bar.connect_value_changed(move |b| {
+        if p.get() {
+            return;
+        }
+        let st = media::live().get();
+        let to = (b.value() * st.length as f64) as i64;
+        debounce.call(move || media::seek(to));
+    });
+    // The bar and times move on their own while playing (players don't announce it).
+    let draw_progress = {
+        let (bar, elapsed, total, progress, pushing) =
+            (bar.clone(), elapsed.clone(), total.clone(), progress.clone(), pushing.clone());
+        move |st: &media::State| {
+            progress.set_visible(st.length > 0);
+            if st.length > 0 {
+                let now = st.position_now();
+                pushing.set(true);
+                bar.set_value(now as f64 / st.length as f64);
+                pushing.set(false);
+                bar.set_sensitive(st.can_seek);
+                elapsed.set_text(&clock(now));
+                total.set_text(&clock(st.length));
+            }
+        }
+    };
+    let tick: Rc<std::cell::RefCell<Option<glib::SourceId>>> = Rc::default();
+    let (dp, tk) = (draw_progress.clone(), tick.clone());
+    tile.connect_map(move |_| {
+        let dp = dp.clone();
+        *tk.borrow_mut() = Some(glib::timeout_add_local(std::time::Duration::from_secs(1), move || {
+            let st = media::live().get();
+            if st.playing {
+                dp(&st);
+            }
+            glib::ControlFlow::Continue
+        }));
+    });
+    tile.connect_unmap(move |_| {
+        if let Some(id) = tick.borrow_mut().take() {
+            id.remove();
+        }
+    });
+
     let shown_art: Rc<std::cell::RefCell<Option<String>>> = Rc::default();
     bind(&tile, media::live(), move |st| {
         let nothing = st.player.is_empty();
@@ -657,20 +749,27 @@ fn media_tile(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
         } else {
             &st.title
         });
-        artist.set_text(&st.artist);
-        artist.set_visible(!st.artist.is_empty());
-        player.set_text(&player_name(&st.player));
-        player.set_visible(!nothing);
+        let who: Vec<String> = [st.artist.clone(), player_name(&st.player)].into_iter().filter(|x| !x.is_empty()).collect();
+        artist.set_text(&who.join(" · "));
+        artist.set_visible(!who.is_empty());
         buttons.set_sensitive(!nothing);
         prev.set_sensitive(st.can_previous);
         next.set_sensitive(st.can_next);
         play.set_icon_name(if st.playing { "media-playback-pause-symbolic" } else { "media-playback-start-symbolic" });
         play.set_tooltip_text(Some(if st.playing { "Pause" } else { "Play" }));
+        draw_progress(st);
         if *shown_art.borrow() != st.art || st.art.is_none() {
             match &st.art {
-                Some(uri) => art.set_from_gicon(&ui::file_icon(uri)),
-                None => art.set_icon_name(Some("audio-x-generic-symbolic")),
+                Some(uri) => {
+                    art.set_from_gicon(&ui::file_icon(uri));
+                    art.set_pixel_size(80);
+                }
+                None => {
+                    art.set_icon_name(Some("audio-x-generic-symbolic"));
+                    art.set_pixel_size(28);
+                }
             }
+            set_class(&art_box, "empty", st.art.is_none());
             *shown_art.borrow_mut() = st.art.clone();
         }
     });
@@ -735,10 +834,10 @@ fn upcoming(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     head.append(&i);
     head.append(&label("Up next", "cc-title"));
     tile.append(&head);
-    let list = gtk::Box::new(gtk::Orientation::Vertical, 2);
+    let list = gtk::Box::new(gtk::Orientation::Vertical, 4);
     list.set_vexpand(true);
     tile.append(&list);
-    let rows = if size.rows >= 3 { 4 } else { 2 };
+    let rows = if size.rows >= 3 { 3 } else { 2 };
     clickable(&tile, || ui::launch(&["gtk-launch", "io.github.design_nexus.nyx.Calendar.desktop"]));
     let t = tile.clone();
     bind(&tile, calendar::live(), move |st| {
@@ -747,32 +846,26 @@ fn upcoming(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
         }
         let now = glib::real_time() / 1_000_000;
         if !st.available || st.events.is_empty() {
-            list.append(&label(
-                if st.available { "Nothing coming up" } else { "Open Calendar once to see events here" },
-                "cc-status",
-            ));
+            let l = label(if st.available { "Nothing coming up" } else { "Open Calendar once to see events here" }, "cc-status");
+            l.set_vexpand(true);
+            l.set_valign(gtk::Align::Center);
+            l.set_xalign(0.5);
+            list.append(&l);
             t.set_tooltip_text(Some("Open Calendar"));
             return;
         }
+        // Each event as Calendar's week view draws it: a block in its calendar's colour,
+        // the title, and when (and where) below it.
         for e in st.events.iter().take(rows) {
-            let r = gtk::Box::new(gtk::Orientation::Horizontal, 8);
-            r.add_css_class("cc-event");
-            let dot = gtk::Label::new(None);
-            dot.set_markup(&format!(
-                "<span foreground=\"{}\">●</span>",
-                glib::markup_escape_text(e.color.as_deref().unwrap_or("#888888"))
-            ));
-            r.append(&dot);
-            r.append(&label(&e.title, "cc-event-title"));
-            let when = gtk::Label::new(Some(&event_when(e, now)));
-            when.add_css_class("cc-event-when");
-            r.append(&when);
-            r.set_tooltip_text(Some(&if e.location.is_empty() {
-                format!("{} ({})", e.title, e.calendar)
-            } else {
-                format!("{} at {} ({})", e.title, e.location, e.calendar)
-            }));
-            list.append(&r);
+            let block = gtk::Box::new(gtk::Orientation::Vertical, 0);
+            block.add_css_class("cc-event");
+            block.add_css_class(&ui::event_class(e.color.as_deref().unwrap_or("#8a8f98")));
+            block.append(&label(&e.title, "cc-event-title"));
+            let when = event_when(e, now);
+            let sub = if e.location.is_empty() { when } else { format!("{when} · {}", e.location) };
+            block.append(&label(&sub, "cc-event-when"));
+            block.set_tooltip_text(Some(&format!("{} — {}", e.title, e.calendar)));
+            list.append(&block);
         }
         t.set_tooltip_text(Some("Open Calendar"));
     });

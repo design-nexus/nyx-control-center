@@ -424,23 +424,25 @@ fn bluetooth_view(back: Rc<dyn Fn()>) -> gtk::Widget {
     let quiet = guarded_switch(&sw, |on| act(bluetooth::set_powered(on)));
     let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
     root.append(&scrolled(&body));
-    let look = gtk::ToggleButton::new();
-    look.set_icon_name("system-search-symbolic");
-    look.add_css_class("cc-icon-button");
-    look.set_tooltip_text(Some("Look for devices to pair (stops when you leave this view)"));
-    look.connect_toggled(|t| act(bluetooth::discover(t.is_active())));
+    // Opening the view looks for devices nearby; leaving it stops. Refresh starts over.
+    let refresh = icon_button("view-refresh-symbolic", "Look for devices again");
+    refresh.connect_clicked(|_| {
+        glib::MainContext::default().spawn_local(async {
+            let _ = bluetooth::discover(false).await;
+            glib::timeout_future(std::time::Duration::from_millis(300)).await;
+            act(bluetooth::discover(true));
+        });
+    });
     let settings = icon_button("emblem-system-symbolic", "Bluetooth settings");
     settings.connect_clicked(|_| ui::open_settings("bluetooth"));
-    let f = foot(&[settings]);
-    f.prepend(&look);
-    root.append(&f);
-    // Stop looking when the view goes.
-    let l2 = look.clone();
-    root.connect_unmap(move |_| {
-        if l2.is_active() {
-            l2.set_active(false);
+    root.append(&foot(&[refresh.clone(), settings]));
+    root.connect_map(|_| {
+        if bluetooth::live().get().powered {
+            act(bluetooth::discover(true));
         }
     });
+    root.connect_unmap(|_| act(bluetooth::discover(false)));
+    let look = refresh;
     let b = body.clone();
     // The device being connected, disconnected, paired or forgotten.
     let busy: Rc<std::cell::RefCell<Option<String>>> = Rc::default();
@@ -470,8 +472,7 @@ fn bluetooth_view(back: Rc<dyn Fn()>) -> gtk::Widget {
             }
         };
         if st.devices.is_empty() {
-            let l = label("No paired devices. Look for one with the search button below.", "cc-empty");
-            l.set_wrap(true);
+            let l = label("No paired devices yet", "cc-empty");
             l.set_xalign(0.5);
             b.append(&l);
         } else {
@@ -512,10 +513,10 @@ fn bluetooth_view(back: Rc<dyn Fn()>) -> gtk::Widget {
             b.append(&c);
         }
         if st.discovering || !st.nearby.is_empty() {
-            b.append(&group(if st.discovering { "Nearby (looking…)" } else { "Nearby" }));
+            b.append(&group(if st.discovering { "Available (looking…)" } else { "Available" }));
             let c = card();
             if st.nearby.is_empty() {
-                c.append(&row("system-search-symbolic", "Looking…", Some("Put the device in pairing mode")));
+                c.append(&row("system-search-symbolic", "Looking for devices…", Some("Put the device in pairing mode")));
             }
             for d in st.nearby.iter().take(12) {
                 let sub = if is_busy(&d.path) { Some("Pairing…") } else { None };
@@ -796,7 +797,6 @@ pub fn volume_popover(anchor: &gtk::Button) {
     let (mrow, mbutton, mscale, mvalue) = ui::slider("audio-input-microphone-symbolic", "Mute the microphone");
     mrow.add_css_class("tint-coral");
     mscale.set_range(0.0, 1.5);
-    mscale.add_mark(1.0, gtk::PositionType::Bottom, None);
     col.append(&mrow);
     let inputs = gtk::Box::new(gtk::Orientation::Vertical, 0);
     col.append(&inputs);

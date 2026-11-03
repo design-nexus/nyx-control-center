@@ -185,15 +185,15 @@ async fn done(r: Result<(), String>) -> Result<(), String> {
     r
 }
 
-/// Go direct: both off.
+/// Go direct: every VPN service and Tor off.
 pub async fn direct() -> Result<(), String> {
-    let st = live().get();
-    if st.nord.connected() {
-        run(&["nordvpn", "disconnect"], None).await?;
+    for s in crate::vpn::live().get().services.iter().filter(|s| s.connected) {
+        crate::vpn::disconnect(s).await?;
     }
-    if st.tor.connected {
+    if live().get().tor.connected {
         run(&["tormarchy", "disconnect"], None).await?;
     }
+    crate::vpn::refresh(crate::vpn::live().setter());
     done(Ok(())).await
 }
 
@@ -339,11 +339,13 @@ pub async fn tor_panic() -> Result<(), String> {
     done(run(&["tormarchy", "panic"], None).await).await
 }
 
-/// Tor, in `mode`. A mode that carries traffic takes NordVPN down first.
+/// Tor, in `mode`. A mode that carries traffic takes any VPN down first.
 pub async fn tor(mode: TorMode) -> Result<(), String> {
     let st = live().get();
-    if mode != TorMode::Socks && st.nord.connected() {
-        run(&["nordvpn", "disconnect"], None).await?;
+    if mode != TorMode::Socks {
+        for s in crate::vpn::live().get().services.iter().filter(|s| s.connected) {
+            crate::vpn::disconnect(s).await?;
+        }
     }
     let r = if st.tor.connected {
         run(&["tormarchy", "mode", mode.arg()], None).await

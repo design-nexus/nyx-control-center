@@ -735,34 +735,64 @@ window.nyx-control-center .cc-segmented button.tint-teal:checked {
   color: @cc_teal;
 }
 
-/* Media: full width, cover art and big controls. */
+/* Media: the cover, what it is with progress, big controls on the right. */
 window.nyx-control-center .cc-media .cc-art {
   border-radius: 9px;
 }
 
 window.nyx-control-center .cc-media-title {
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 600;
 }
 
-window.nyx-control-center .cc-media-player {
-  font-size: 11px;
-  color: @theme_text_tertiary;
+window.nyx-control-center .cc-media-artist {
+  font-size: 12px;
+  color: @theme_dim_text;
 }
 
-window.nyx-control-center .cc-media .cc-media-buttons {
+window.nyx-control-center .cc-media-progress {
   margin-top: 6px;
 }
 
+window.nyx-control-center .cc-media-progress scale trough {
+  min-height: 4px;
+}
+
+window.nyx-control-center .cc-media-progress scale highlight {
+  background: @cc_pink;
+}
+
+window.nyx-control-center .cc-media-progress scale slider {
+  min-width: 10px;
+  min-height: 10px;
+  margin: -4px;
+}
+
+window.nyx-control-center .cc-media-time {
+  font-size: 10.5px;
+  color: @theme_text_tertiary;
+  font-feature-settings: "tnum";
+}
+
 window.nyx-control-center .cc-media .cc-media-buttons button.cc-icon-button {
-  min-width: 32px;
-  min-height: 32px;
+  min-width: 38px;
+  min-height: 38px;
+  border-radius: 999px;
+}
+
+window.nyx-control-center .cc-media .cc-media-buttons button.cc-icon-button image {
+  -gtk-icon-size: 18px;
 }
 
 window.nyx-control-center .cc-media button.cc-play {
+  min-width: 46px;
+  min-height: 46px;
   background: @cc_pink;
   color: @theme_bg;
-  border-radius: 999px;
+}
+
+window.nyx-control-center .cc-media button.cc-play image {
+  -gtk-icon-size: 22px;
 }
 
 window.nyx-control-center .cc-media button.cc-play:hover {
@@ -863,12 +893,48 @@ window.nyx-control-center .cc-upcoming-head image {
   color: @cc_red;
 }
 
+window.nyx-control-center .cc-event {
+  border-radius: 7px;
+  padding: 4px 9px 5px;
+  background: alpha(@theme_text, 0.06);
+}
+
 window.nyx-control-center .cc-event-title {
   font-size: 12.5px;
+  font-weight: 600;
 }
 
 window.nyx-control-center .cc-event-when {
   font-size: 11.5px;
   color: @theme_dim_text;
   font-feature-settings: "tnum";
+}
+
+window.nyx-control-center .cc-value.loud {
+  color: @cc_amber;
+}
+
+/* Keyboard light: a pip per level. */
+window.nyx-control-center .cc-pips {
+  margin-bottom: 6px;
+}
+
+window.nyx-control-center .cc-pip {
+  min-width: 8px;
+  min-height: 3px;
+  border-radius: 2px;
+  background: alpha(@theme_text, 0.18);
+}
+
+window.nyx-control-center .cc-pip.lit {
+  background: @cc_teal;
+}
+
+window.nyx-control-center .cc-art-box {
+  border-radius: 9px;
+}
+
+window.nyx-control-center .cc-art-box.empty {
+  background: alpha(@theme_text, 0.06);
+  color: @theme_text_tertiary;
 }

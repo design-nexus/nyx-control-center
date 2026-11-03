@@ -29,6 +29,7 @@ pub mod omarchy;
 pub mod power;
 pub mod routes;
 pub mod tailscale;
+pub mod vpn;
 
 use gio::prelude::*;
 use std::cell::RefCell;

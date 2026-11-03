@@ -125,3 +125,42 @@ pub fn open_settings(page: &str) {
 pub fn file_icon(uri: &str) -> gio::Icon {
     gio::FileIcon::new(&gio::File::for_uri(uri)).upcast()
 }
+
+/// A CSS class drawing an event in its calendar's colour, as Nyx Calendar's week view
+/// does: the colour at a fifth over the card, a faint edge in it, the title tinted
+/// toward it. Rules are added once per colour.
+pub fn event_class(hex: &str) -> String {
+    use std::collections::BTreeSet;
+    thread_local!(static DONE: RefCell<(Option<gtk::CssProvider>, BTreeSet<String>)> = RefCell::default());
+    let clean: String = hex.trim_start_matches('#').chars().filter(|c| c.is_ascii_hexdigit()).take(6).collect();
+    if clean.len() != 6 {
+        return "cc-ev-plain".into();
+    }
+    let class = format!("cc-ev-{clean}");
+    DONE.with(|d| {
+        let mut d = d.borrow_mut();
+        if !d.1.insert(clean.clone()) {
+            return;
+        }
+        let rules: String = d
+            .1
+            .iter()
+            .map(|h| {
+                format!(
+                    "window.nyx-control-center .cc-event.cc-ev-{h} {{ background: mix(@theme_card, #{h}, 0.20); border: 1px solid alpha(#{h}, 0.28); }}\n\
+                     window.nyx-control-center .cc-event.cc-ev-{h} .cc-event-title {{ color: mix(@theme_text, #{h}, 0.45); }}\n\
+                     window.nyx-control-center .cc-event.cc-ev-{h} .cc-event-when {{ color: alpha(mix(@theme_text, #{h}, 0.45), 0.8); }}\n"
+                )
+            })
+            .collect();
+        let provider = d.0.get_or_insert_with(|| {
+            let p = gtk::CssProvider::new();
+            if let Some(display) = gtk::gdk::Display::default() {
+                gtk::style_context_add_provider_for_display(&display, &p, gtk::STYLE_PROVIDER_PRIORITY_APPLICATION + 1);
+            }
+            p
+        });
+        provider.load_from_string(&rules);
+    });
+    class
+}

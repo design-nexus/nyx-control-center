@@ -54,13 +54,16 @@ Two bar widgets are installed; add them from Settings → Plugins (or
   external monitor over DDC, as Omarchy's brightness keys do. The screen button opens
   **Screens**: each screen's brightness, the scale, the text size everywhere, and the
   laptop's own screen on or off while another is plugged in.
-- **Microphone**: mute it; red while an app is recording.
-- **Up next**: the coming events from Nyx Calendar; click to open Calendar.
+- **Microphone**: mute it; red while an app is recording. **Keyboard light**: a click
+  steps through its levels, shown as pips under the icon.
+- **Up next**: the coming events from Nyx Calendar, drawn as in Calendar's week view;
+  click to open Calendar.
 - **Home**: a room's lights and devices from Nyx Home (pick the room from the tile's
   header), with its scenes. Click to switch a device; right-click a light for brightness
   and colour. Home's service (`nyx-homed`) does the talking to Home Assistant, so Home
   needn't be open.
-- **Now playing** from any player (Nyx Music, browsers, …) with its controls.
+- **Now playing** from any player (Nyx Music, browsers, …): the cover, a progress bar to
+  drag, and big controls.
 - **Power mode** (power saver, balanced, performance) and the battery; the battery
   opens its details: power draw, capacity, charge cycles and the charge limit.
 - **Omarchy's switches**: Do not disturb, Night light, Keep awake, the workspace's mode
@@ -105,7 +108,7 @@ sizes they come in:
 | `sound` (volume and brightness) | 4x2, 2x2 |
 | `home` | 2x3, 4x3 |
 | `media` | 4x2 |
-| `upcoming` (Up next) | 4x2, 2x2, 4x3 |
+| `upcoming` (Up next) | 4x3, 2x3 |
 | `power` | 2x1, 4x1 |
 | `battery` | 1x1, 2x1 |
 | `dnd`, `mode`, `night-light`, `keep-awake`, `keyboard-light`, `microphone`, `capture` | 1x1 |
