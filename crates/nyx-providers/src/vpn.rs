@@ -178,18 +178,84 @@ async fn read_state() -> State {
     State { services }
 }
 
-/// The VPN the Control Center shows: the one picked in Settings › Online Accounts › VPN
-/// (`default = "nord"` in `~/.config/nyx/vpn.toml`), else the first set up.
+// ---------------------------------------------------------------- Settings
+
+/// `~/.config/nyx/vpn.toml`: the VPN the Control Center shows (`default`, written by
+/// Settings › Online Accounts › VPN) and, per service, favourite servers and the one
+/// to connect to (`server`; none is the fastest).
 pub fn config_path() -> std::path::PathBuf {
     glib::user_config_dir().join("nyx/vpn.toml")
 }
 
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct Favorite {
+    /// What to pass the tool (`Sweden`, `Stockholm`, `se sto`).
+    pub arg: String,
+    /// What to show ("Stockholm, Sweden").
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct ServiceConfig {
+    /// Where to connect by default (an `arg`); none: the fastest.
+    pub server: Option<String>,
+    pub favorites: Vec<Favorite>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+pub struct Config {
+    pub default: Option<String>,
+    pub services: std::collections::BTreeMap<String, ServiceConfig>,
+}
+
+pub fn load_config() -> Config {
+    std::fs::read_to_string(config_path()).ok().and_then(|t| toml::from_str(&t).ok()).unwrap_or_default()
+}
+
+fn save_config(c: &Config) {
+    let path = config_path();
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::create_dir_all(dir);
+    }
+    let text = format!(
+        "# The VPN the Control Center shows (Settings › Online Accounts › VPN), and each\n# service's favourite servers and default server (none: the fastest).\n{}",
+        toml::to_string(c).unwrap_or_default()
+    );
+    let tmp = path.with_extension("toml.tmp");
+    if std::fs::write(&tmp, text).is_ok() {
+        let _ = std::fs::rename(&tmp, &path);
+    }
+}
+
 pub fn chosen_id() -> Option<String> {
-    let text = std::fs::read_to_string(config_path()).ok()?;
-    text.lines().find_map(|l| {
-        let (k, v) = l.split_once('=')?;
-        (k.trim() == "default").then(|| v.trim().trim_matches('"').to_string())
-    })
+    load_config().default
+}
+
+/// A service's favourites and default server.
+pub fn service_config(id: &str) -> ServiceConfig {
+    load_config().services.get(id).cloned().unwrap_or_default()
+}
+
+/// Star or unstar a server. Unstarring the default server goes back to the fastest.
+pub fn set_favorite(id: &str, place: &Favorite, on: bool) {
+    let mut c = load_config();
+    let sc = c.services.entry(id.to_string()).or_default();
+    sc.favorites.retain(|f| f.arg != place.arg);
+    if on {
+        sc.favorites.push(place.clone());
+    } else if sc.server.as_deref() == Some(place.arg.as_str()) {
+        sc.server = None;
+    }
+    save_config(&c);
+}
+
+/// Where to connect by default: a server's `arg`, or `None` for the fastest.
+pub fn set_server(id: &str, arg: Option<&str>) {
+    let mut c = load_config();
+    c.services.entry(id.to_string()).or_default().server = arg.map(String::from);
+    save_config(&c);
 }
 
 pub fn pick_default(services: &[Service], chosen: Option<&str>) -> Option<Service> {
@@ -256,6 +322,14 @@ pub async fn connect(s: &Service, place: Option<&str>) -> Result<(), String> {
     if crate::routes::live().get().tor.routing() {
         run(&["tormarchy", "disconnect"], None).await?;
     }
+    // No place: the default server, if one is set. An empty place: the fastest, whatever
+    // the default.
+    let chosen = if place.is_none() { service_config(&s.id).server } else { None };
+    let place = match place {
+        Some("") => None,
+        Some(p) => Some(p),
+        None => chosen.as_deref(),
+    };
     let r = match (&s.kind, place) {
         (Kind::Nord, Some(p)) => run(&["nordvpn", "connect", p], None).await,
         (Kind::Nord, None) => run(&["nordvpn", "connect"], None).await,
@@ -318,6 +392,46 @@ pub async fn places(kind: &Kind) -> Vec<Place> {
 pub async fn nord_cities(country: &str) -> Vec<Place> {
     let Some(t) = output(&["nordvpn", "cities", country]).await else { return Vec::new() };
     words(&t).into_iter().map(|c| Place { name: c.replace('_', " "), arg: c, city: true }).collect()
+}
+
+/// Every NordVPN city ("Atlanta, United States"), for searching. Asked of `nordvpn`
+/// fifteen countries at a time and kept for a week in `~/.cache/nyx/nordvpn-cities.json`.
+pub async fn nord_all_cities() -> Vec<Place> {
+    let cache = glib::user_cache_dir().join("nyx/nordvpn-cities.json");
+    let fresh = std::fs::metadata(&cache)
+        .and_then(|m| m.modified())
+        .ok()
+        .and_then(|t| t.elapsed().ok())
+        .is_some_and(|age| age < Duration::from_secs(7 * 86_400));
+    if fresh
+        && let Some(v) = std::fs::read_to_string(&cache).ok().and_then(|t| serde_json::from_str::<Vec<(String, String)>>(&t).ok())
+    {
+        return v.into_iter().map(|(arg, name)| Place { arg, name, city: true }).collect();
+    }
+    let countries = places(&Kind::Nord).await;
+    let mut out: Vec<(String, String)> = Vec::new();
+    for chunk in countries.chunks(15) {
+        let handles: Vec<_> = chunk
+            .iter()
+            .map(|c| {
+                let (arg, name) = (c.arg.clone(), c.name.clone());
+                glib::MainContext::default().spawn_local(async move { (name, nord_cities(&arg).await) })
+            })
+            .collect();
+        for h in handles {
+            if let Ok((country, cities)) = h.await {
+                out.extend(cities.into_iter().map(|c| (c.arg, format!("{}, {country}", c.name))));
+            }
+        }
+    }
+    out.sort_by(|a, b| a.1.cmp(&b.1));
+    if !out.is_empty() {
+        if let Some(dir) = cache.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let _ = std::fs::write(&cache, serde_json::to_string(&out).unwrap_or_default());
+    }
+    out.into_iter().map(|(arg, name)| Place { arg, name, city: true }).collect()
 }
 
 fn words(t: &str) -> Vec<String> {
@@ -457,6 +571,21 @@ mod tests {
         assert_eq!(s.len(), 2);
         assert_eq!(s[0].kind, Kind::Nm { uuid: "bbb".into(), wireguard: true });
         assert!(s[1].connected);
+    }
+
+    #[test]
+    fn config_round_trip() {
+        let mut c = Config { default: Some("nord".into()), ..Default::default() };
+        let sc = c.services.entry("nord".into()).or_default();
+        sc.server = Some("Sweden".into());
+        sc.favorites.push(Favorite { arg: "Atlanta".into(), name: "Atlanta, United States".into() });
+        let text = toml::to_string(&c).unwrap();
+        assert_eq!(toml::from_str::<Config>(&text).unwrap(), c);
+        assert_eq!(
+            toml::from_str::<Config>("default = \"mullvad\"\n").unwrap().default.as_deref(),
+            Some("mullvad"),
+            "Settings' one-line file"
+        );
     }
 
     #[test]

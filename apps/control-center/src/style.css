@@ -943,3 +943,12 @@ window.nyx-control-center entry.cc-search-inline,
 window.nyx-control-center searchentry.cc-search-inline {
   margin: 4px 6px 6px;
 }
+
+/* VPN favourites: a gold star, the default's radio in the accent. */
+window.nyx-control-center button.cc-star.on {
+  color: @cc_amber;
+}
+
+window.nyx-control-center button.cc-default-mark.on {
+  color: @cc_green;
+}

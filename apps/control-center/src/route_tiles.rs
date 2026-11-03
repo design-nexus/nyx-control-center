@@ -33,6 +33,22 @@ fn row_button(icon_name: &str, tip: &str, f: impl Fn() + 'static) -> gtk::Button
     b
 }
 
+/// A star at the end of a server's row: add it to (or take it off) the favourites.
+fn star_button(svc_id: &str, place: vpn::Favorite, starred: bool, redraw: impl Fn() + 'static) -> gtk::Button {
+    let tip =
+        if starred { format!("Remove {} from favourites", place.name) } else { format!("Add {} to favourites", place.name) };
+    let b = row_button(if starred { "starred-symbolic" } else { "non-starred-symbolic" }, &tip, {
+        let id = svc_id.to_string();
+        move || {
+            vpn::set_favorite(&id, &place, !starred);
+            redraw();
+        }
+    });
+    b.add_css_class("cc-star");
+    set_class(&b, "on", starred);
+    b
+}
+
 /// A row that's picked (a check at its end when it's the current one).
 fn choice_row(icon_name: &str, title: &str, sub: Option<&str>, current: bool, f: impl Fn() + 'static) -> gtk::Box {
     let r = row(icon_name, title, sub);
@@ -398,13 +414,20 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
     root.append(&crate::details::foot(&[setup]));
     // The default VPN's places and NordVPN's settings are slow to ask for: once per view.
     let countries: Rc<RefCell<Option<Vec<vpn::Place>>>> = Rc::default();
+    // Every NordVPN city, for searching (cached a week).
+    let all_cities: Rc<RefCell<Option<Vec<vpn::Place>>>> = Rc::default();
     // Built once and moved into the list on each redraw, so typing survives a refresh.
     let search = gtk::SearchEntry::new();
     search.set_placeholder_text(Some("Find a location"));
     search.add_css_class("cc-search");
     search.add_css_class("cc-search-inline");
+    // For screenshots: the location list open, with a search typed.
+    let test_search = std::env::var("NYX_CC_TEST_SEARCH").ok();
     let settings: Rc<RefCell<Option<NordSettings>>> = Rc::default();
-    let show_countries = Rc::new(std::cell::Cell::new(false));
+    let show_countries = Rc::new(std::cell::Cell::new(test_search.is_some()));
+    if let Some(q) = &test_search {
+        search.set_text(q);
+    }
     let open_country: Rc<RefCell<Option<String>>> = Rc::default();
     let cities: Rc<RefCell<std::collections::HashMap<String, Vec<String>>>> = Rc::default();
     let technology: Rc<RefCell<Option<String>>> = Rc::default();
@@ -418,6 +441,7 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
     let b = body.clone();
     let (cs, ss, sc, sl) = (countries.clone(), settings.clone(), show_countries.clone(), slot.clone());
     let srch = search.clone();
+    let allc = all_cities.clone();
     {
         // Typing filters the list (the view redraws, the box keeps its text and focus).
         let sl2 = slot.clone();
@@ -515,12 +539,25 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
             let has_places = st.nord.service.as_ref().is_some_and(|s| s.has_locations());
             b.append(&group(&st.nord.name));
             let c = card();
-            let r =
-                row("find-location-symbolic", "Location", Some(if st.nord.connected() { &st.nord.country } else { "Fastest" }));
+            let svc_id = st.nord.service.as_ref().map(|s| s.id.clone()).unwrap_or_default();
+            let conf = vpn::service_config(&svc_id);
+            let default_name = conf
+                .server
+                .as_ref()
+                .map(|a| {
+                    conf.favorites.iter().find(|f| &f.arg == a).map(|f| f.name.clone()).unwrap_or_else(|| a.replace('_', " "))
+                })
+                .unwrap_or_else(|| "Fastest".to_string());
+            let r = row(
+                "find-location-symbolic",
+                "Location",
+                Some(if st.nord.connected() { &st.nord.country } else { &default_name }),
+            );
             let sc2 = sc.clone();
             let cs2 = cs.clone();
             let rd = redraw.clone();
             let k2 = kind.clone();
+            let allc2 = allc.clone();
             r.append(&row_button(if sc.get() { "pan-up-symbolic" } else { "pan-down-symbolic" }, "Pick a country", move || {
                 sc2.set(!sc2.get());
                 if cs2.borrow().is_none()
@@ -532,11 +569,76 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
                         rd2();
                     });
                 }
+                // NordVPN's cities, for the search, gathered while you look.
+                if k2 == Some(vpn::Kind::Nord) && allc2.borrow().is_none() {
+                    *allc2.borrow_mut() = Some(Vec::new());
+                    let (a3, rd2) = (allc2.clone(), rd.clone());
+                    glib::MainContext::default().spawn_local(async move {
+                        *a3.borrow_mut() = Some(vpn::nord_all_cities().await);
+                        rd2();
+                    });
+                }
                 rd();
             }));
             r.set_visible(has_places);
             c.append(&r);
+            // Favourite servers: connect with a click; the marked one (or Fastest) is
+            // where the tile and the switch connect.
+            if has_places && !conf.favorites.is_empty() {
+                let mut options: Vec<(Option<String>, String)> = vec![(None, "Fastest".to_string())];
+                options.extend(conf.favorites.iter().map(|f| (Some(f.arg.clone()), f.name.clone())));
+                for (arg, name) in options {
+                    let is_default = conf.server == arg;
+                    let icon_name = if arg.is_none() { "find-location-symbolic" } else { "starred-symbolic" };
+                    let r = row(icon_name, &name, if is_default { Some("Default") } else { None });
+                    r.add_css_class("cc-favorite");
+                    let mark = row_button(
+                        if is_default { "radio-checked-symbolic" } else { "radio-symbolic" },
+                        if is_default { "Where the VPN connects by default" } else { "Connect here by default" },
+                        {
+                            let (id, a, rd2) = (svc_id.clone(), arg.clone(), redraw.clone());
+                            move || {
+                                vpn::set_server(&id, a.as_deref());
+                                rd2();
+                            }
+                        },
+                    );
+                    mark.add_css_class("cc-default-mark");
+                    set_class(&mark, "on", is_default);
+                    r.append(&mark);
+                    if let Some(a) = &arg {
+                        let fav = vpn::Favorite { arg: a.clone(), name: name.clone() };
+                        r.append(&star_button(&svc_id, fav, true, redraw.clone()));
+                    }
+                    let a = arg.clone();
+                    crate::details::on_click(&r, move || {
+                        let a = a.clone();
+                        // "" is the fastest, whatever the default.
+                        act(async move { routes::nord(Some(a.as_deref().unwrap_or(""))).await });
+                    });
+                    c.append(&r);
+                }
+            }
             if sc.get() && has_places {
+                // Whatever opened the list, its places (and NordVPN's cities) load.
+                if cs.borrow().is_none()
+                    && let Some(k) = kind.clone()
+                {
+                    *cs.borrow_mut() = Some(Vec::new());
+                    let (cs3, rd2) = (cs.clone(), redraw.clone());
+                    glib::MainContext::default().spawn_local(async move {
+                        *cs3.borrow_mut() = Some(vpn::places(&k).await);
+                        rd2();
+                    });
+                }
+                if is_nord && allc.borrow().is_none() {
+                    *allc.borrow_mut() = Some(Vec::new());
+                    let (a3, rd2) = (allc.clone(), redraw.clone());
+                    glib::MainContext::default().spawn_local(async move {
+                        *a3.borrow_mut() = Some(vpn::nord_all_cities().await);
+                        rd2();
+                    });
+                }
                 if let Some(p) = srch.parent()
                     && let Ok(pb) = p.downcast::<gtk::Box>()
                 {
@@ -548,6 +650,7 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
                 list.add_css_class("cc-country-list");
                 match cs.borrow().as_ref() {
                     None => list.append(&label("Loading…", "cc-row-sub")),
+                    Some(all) if all.is_empty() => list.append(&label("Loading…", "cc-row-sub")),
                     Some(all) => {
                         for place in all.iter().filter(|p| query.is_empty() || p.name.to_lowercase().contains(&query)) {
                             let country = &place.arg;
@@ -562,6 +665,13 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
                                     act(async move { routes::nord(Some(&cc)).await });
                                 });
                                 r.add_css_class("cc-indent");
+                                let starred = conf.favorites.iter().any(|f| f.arg == place.arg);
+                                r.append(&star_button(
+                                    &svc_id,
+                                    vpn::Favorite { arg: place.arg.clone(), name: shown.clone() },
+                                    starred,
+                                    redraw.clone(),
+                                ));
                                 list.append(&r);
                                 continue;
                             }
@@ -571,6 +681,13 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
                                 let cc = cc.clone();
                                 act(async move { routes::nord(Some(&cc)).await });
                             });
+                            let starred = conf.favorites.iter().any(|f| &f.arg == country);
+                            r.append(&star_button(
+                                &svc_id,
+                                vpn::Favorite { arg: country.clone(), name: shown.clone() },
+                                starred,
+                                redraw.clone(),
+                            ));
                             let open = oc.borrow().as_deref() == Some(country.as_str());
                             let (oc2, ci2, rd2, cc2) = (oc.clone(), ci.clone(), redraw.clone(), country.clone());
                             if !is_nord {
@@ -602,6 +719,8 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
                                         for city in cs {
                                             let name = city.replace('_', " ");
                                             let here = current && st.nord.city == name;
+                                            let starred = conf.favorites.iter().any(|f| &f.arg == city);
+                                            let fav = vpn::Favorite { arg: city.clone(), name: format!("{name}, {shown}") };
                                             let (city, sc3) = (city.clone(), sc.clone());
                                             let r = choice_row("mark-location-symbolic", &name, None, here, move || {
                                                 sc3.set(false);
@@ -609,12 +728,44 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
                                                 act(async move { routes::nord(Some(&c)).await });
                                             });
                                             r.add_css_class("cc-indent");
+                                            r.append(&star_button(&svc_id, fav, starred, redraw.clone()));
                                             list.append(&r);
                                         }
                                     }
                                 }
                             }
                         }
+                    }
+                }
+                // Searching NordVPN also finds cities ("Atlanta, United States").
+                if is_nord && !query.is_empty() {
+                    match allc.borrow().as_ref() {
+                        Some(cities) if !cities.is_empty() => {
+                            let hits: Vec<&vpn::Place> =
+                                cities.iter().filter(|p| p.name.to_lowercase().contains(&query)).take(40).collect();
+                            if !hits.is_empty() {
+                                let cap = label("Cities", "cc-group");
+                                list.append(&cap);
+                            }
+                            for p in hits {
+                                let here = st.nord.connected() && p.name.starts_with(&st.nord.city) && !st.nord.city.is_empty();
+                                let starred = conf.favorites.iter().any(|f| f.arg == p.arg);
+                                let (arg, sc3) = (p.arg.clone(), sc.clone());
+                                let r = choice_row("mark-location-symbolic", &p.name, None, here, move || {
+                                    sc3.set(false);
+                                    let a = arg.clone();
+                                    act(async move { routes::nord(Some(&a)).await });
+                                });
+                                r.append(&star_button(
+                                    &svc_id,
+                                    vpn::Favorite { arg: p.arg.clone(), name: p.name.clone() },
+                                    starred,
+                                    redraw.clone(),
+                                ));
+                                list.append(&r);
+                            }
+                        }
+                        _ => list.append(&label("Gathering cities to search…", "cc-row-sub")),
                     }
                 }
                 let s = gtk::ScrolledWindow::new();
