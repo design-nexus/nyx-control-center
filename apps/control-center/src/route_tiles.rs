@@ -366,26 +366,32 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
             act(routes::direct());
         }
     });
-    // Built once (a redraw mid-typing would drop it): finds a location of the service
-    // picked below.
-    let search = gtk::SearchEntry::new();
-    search.set_placeholder_text(Some("Find a location"));
-    search.add_css_class("cc-search");
-    search.set_visible(false);
     let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    let top = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    let below = gtk::Box::new(gtk::Orientation::Vertical, 0);
-    body.append(&top);
-    body.append(&search);
-    body.append(&below);
     root.append(&scrolled(&body));
     let setup =
         icon_button("list-add-symbolic", "Set up a VPN: NordVPN, ExpressVPN, Proton, PIA, Mullvad, or a WireGuard/OpenVPN file");
     setup.connect_clicked(|_| ui::open_settings("online-accounts"));
     root.append(&crate::details::foot(&[setup]));
 
-    // The service whose locations show (the connected one, else the one clicked).
-    let chosen: Rc<RefCell<Option<String>>> = Rc::default();
+    // The unfolded location list: built once and moved into its service's card on each
+    // redraw (a rebuilt search box would lose what's being typed); typing only refills
+    // the list.
+    let search = gtk::SearchEntry::new();
+    search.set_placeholder_text(Some("Find a location"));
+    search.add_css_class("cc-search");
+    search.add_css_class("cc-search-inline");
+    let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    let scroll = gtk::ScrolledWindow::new();
+    scroll.set_hscrollbar_policy(gtk::PolicyType::Never);
+    scroll.set_min_content_height(200);
+    scroll.set_max_content_height(200);
+    scroll.set_child(Some(&list));
+    let unfold = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    unfold.append(&search);
+    unfold.append(&scroll);
+
+    // Which service's locations are open (NYX_CC_TEST_UNFOLD opens one, for screenshots).
+    let open_service: Rc<RefCell<Option<String>>> = Rc::new(RefCell::new(std::env::var("NYX_CC_TEST_UNFOLD").ok()));
     let places: Rc<RefCell<std::collections::HashMap<String, Vec<vpn::Place>>>> = Rc::default();
     let cities: Rc<RefCell<std::collections::HashMap<String, Vec<vpn::Place>>>> = Rc::default();
     let open_country: Rc<RefCell<Option<String>>> = Rc::default();
@@ -407,125 +413,46 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
             }
         }
     };
-    let rd = redraw.clone();
-    search.connect_search_changed(move |_| rd());
 
-    let (q, sch) = (search.clone(), search.clone());
-    let draw: Draw = Rc::new(move || {
-        let v = vpn::live().get();
-        let st = routes::live().get();
-        let (on, tor) = current(&v, &st);
-        show_switch(&sw, &quiet, on.is_some() || tor);
-        sw.set_sensitive(!v.services.is_empty() || st.tor.installed);
-        clear(&top);
-        clear(&below);
-        let b = &below;
-        let (sx, tx, lat, br) = (&show_exits, &tor_exits, &latency, &bridges);
-
-        if on.is_some() && tor {
-            let c = card();
-            let r = row("dialog-warning-symbolic", "A VPN and Tor are both on", Some("Pick one to keep"));
-            r.append(&row_button("security-high-symbolic", "Keep the VPN", || act(routes::tor_off())));
-            let svc = on.clone();
-            r.append(&row_button("security-medium-symbolic", "Keep Tor", move || {
-                if let Some(s) = svc.clone() {
-                    act(async move { vpn::disconnect(&s).await });
-                }
-            }));
-            c.append(&r);
-            top.append(&c);
-        }
-
-        // Routes: direct, each service, Tor.
-        if chosen.borrow().is_none() {
-            *chosen.borrow_mut() = on.as_ref().map(|s| s.id.clone());
-        }
-        let c = card();
-        c.append(&choice_row(
-            "security-low-symbolic",
-            "Direct",
-            Some("No VPN: traffic goes straight out"),
-            on.is_none() && !tor,
-            || act(routes::direct()),
-        ));
-        for s in &v.services {
-            let sub = if s.connected {
-                if s.location.is_empty() { "Connected".to_string() } else { format!("Connected · {}", s.location) }
-            } else if s.has_locations() {
-                "Click to connect; the arrow picks a location".to_string()
-            } else {
-                "Click to connect".to_string()
+    // Fill the open service's location list, filtered by the search.
+    let fill: Rc<dyn Fn()> = {
+        let (list, search, open_service, places, cities, open_country) =
+            (list.clone(), search.clone(), open_service.clone(), places.clone(), cities.clone(), open_country.clone());
+        let slot_fill: Rc<RefCell<Option<Rc<dyn Fn()>>>> = Rc::default();
+        let sf = slot_fill.clone();
+        let f: Rc<dyn Fn()> = Rc::new(move || {
+            clear(&list);
+            let v = vpn::live().get();
+            let Some(s) = open_service.borrow().clone().and_then(|id| v.services.iter().find(|x| x.id == id).cloned()) else {
+                return;
             };
-            let icon_name =
-                if matches!(s.kind, vpn::Kind::Nm { .. }) { "network-vpn-symbolic" } else { "security-high-symbolic" };
-            let svc = s.clone();
-            let r = choice_row(icon_name, &s.name, Some(&sub), s.connected, move || {
-                let s = svc.clone();
-                act(async move { vpn::connect(&s, None).await });
-            });
-            if s.has_locations() {
-                let open = chosen.borrow().as_deref() == Some(s.id.as_str());
-                let (ch, rd2, id) = (chosen.clone(), redraw.clone(), s.id.clone());
-                r.append(&row_button(
-                    if open { "pan-up-symbolic" } else { "pan-down-symbolic" },
-                    &format!("{}: choose a location", s.name),
-                    move || {
-                        let now = ch.borrow().as_deref() == Some(id.as_str());
-                        *ch.borrow_mut() = if now { None } else { Some(id.clone()) };
-                        rd2();
-                    },
-                ));
-            }
-            c.append(&r);
-        }
-        if st.tor.installed {
-            let sub = if st.tor.connected {
-                let mode = st.tor.mode.map(|m| m.label()).unwrap_or("On");
-                if st.tor.exit_country.is_empty() {
-                    mode.to_string()
-                } else {
-                    format!("{mode} · exit {}", st.tor.exit_country.to_uppercase())
+            let refill = {
+                let sf = sf.clone();
+                move || {
+                    let f = sf.borrow().clone();
+                    if let Some(f) = f {
+                        f();
+                    }
                 }
-            } else if st.tor.running {
-                format!("Starting… {}%", st.tor.bootstrap)
-            } else {
-                "Off".to_string()
             };
-            c.append(&choice_row("security-medium-symbolic", "Tor", Some(&sub), st.tor.connected, || {
-                act(routes::tor(TorMode::Lan))
-            }));
-        }
-        top.append(&c);
-        if v.services.is_empty() && !st.tor.installed {
-            let l = label("No VPN set up yet. Add one with the button below (Settings › Online Accounts).", "cc-empty");
-            l.set_wrap(true);
-            top.append(&l);
-        }
-
-        // The chosen service: find a location.
-        let picked = chosen.borrow().clone().and_then(|id| v.services.iter().find(|s| s.id == id).cloned());
-        let showing = picked.as_ref().is_some_and(|s| s.has_locations());
-        sch.set_visible(showing);
-        if let Some(s) = picked.filter(|s| s.has_locations()) {
             if !places.borrow().contains_key(&s.id) {
                 places.borrow_mut().insert(s.id.clone(), Vec::new());
-                let (pl, rd2, svc) = (places.clone(), redraw.clone(), s.clone());
+                let (pl, rf, svc) = (places.clone(), refill.clone(), s.clone());
                 glib::MainContext::default().spawn_local(async move {
-                    let list = vpn::places(&svc.kind).await;
-                    pl.borrow_mut().insert(svc.id.clone(), list);
-                    rd2();
+                    let all = vpn::places(&svc.kind).await;
+                    pl.borrow_mut().insert(svc.id.clone(), all);
+                    rf();
                 });
             }
-            let query = q.text().to_lowercase();
             let all = places.borrow().get(&s.id).cloned().unwrap_or_default();
-            let list = gtk::Box::new(gtk::Orientation::Vertical, 0);
-            list.add_css_class("cc-card");
             if all.is_empty() {
                 list.append(&label("Loading locations…", "cc-row-sub"));
+                return;
             }
+            let query = search.text().to_lowercase();
             let mut shown = 0;
             for place in all.iter().filter(|p| query.is_empty() || p.name.to_lowercase().contains(&query)) {
-                if shown >= 60 {
+                if shown >= 80 {
                     break;
                 }
                 shown += 1;
@@ -537,10 +464,10 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
                     act(async move { vpn::connect(&svc, Some(&arg)).await });
                 });
                 set_class(&r, "cc-indent", place.city);
-                // NordVPN: cities under a country.
                 if s.kind == vpn::Kind::Nord {
+                    // Cities under a country, as before.
                     let open = open_country.borrow().as_deref() == Some(place.arg.as_str());
-                    let (oc, ci, rd2, cc) = (open_country.clone(), cities.clone(), redraw.clone(), place.arg.clone());
+                    let (oc, ci, rf, cc) = (open_country.clone(), cities.clone(), refill.clone(), place.arg.clone());
                     r.append(&row_button(
                         if open { "pan-up-symbolic" } else { "pan-down-symbolic" },
                         &format!("Cities in {}", place.name),
@@ -548,14 +475,14 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
                             let now = oc.borrow().as_deref() == Some(cc.as_str());
                             *oc.borrow_mut() = if now { None } else { Some(cc.clone()) };
                             if !now && !ci.borrow().contains_key(&cc) {
-                                let (ci2, rd3, cc2) = (ci.clone(), rd2.clone(), cc.clone());
+                                let (ci2, rf2, cc2) = (ci.clone(), rf.clone(), cc.clone());
                                 glib::MainContext::default().spawn_local(async move {
-                                    let list = vpn::nord_cities(&cc2).await;
-                                    ci2.borrow_mut().insert(cc2, list);
-                                    rd3();
+                                    let l = vpn::nord_cities(&cc2).await;
+                                    ci2.borrow_mut().insert(cc2, l);
+                                    rf2();
                                 });
                             }
-                            rd2();
+                            rf();
                         },
                     ));
                     list.append(&r);
@@ -574,20 +501,118 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
                     list.append(&r);
                 }
             }
-            if !all.is_empty() && shown == 0 {
+            if shown == 0 {
                 list.append(&label("No location matches", "cc-row-sub"));
             }
-            let sc = gtk::ScrolledWindow::new();
-            sc.set_hscrollbar_policy(gtk::PolicyType::Never);
-            sc.set_min_content_height(200);
-            sc.set_max_content_height(200);
-            sc.set_child(Some(&list));
-            b.append(&sc);
+        });
+        *slot_fill.borrow_mut() = Some(f.clone());
+        f
+    };
+    let f2 = fill.clone();
+    search.connect_search_changed(move |_| f2());
 
-            // NordVPN's own settings.
-            if s.kind == vpn::Kind::Nord {
-                nord_settings(b, &s, &settings, &technology, &protocol, &redraw);
+    let draw: Draw = Rc::new(move || {
+        let v = vpn::live().get();
+        let st = routes::live().get();
+        let (on, tor) = current(&v, &st);
+        show_switch(&sw, &quiet, on.is_some() || tor);
+        sw.set_sensitive(!v.services.is_empty() || st.tor.installed);
+        // Keep typing in the search box across the rebuild.
+        let typing = search.has_focus() || search.focus_child().is_some();
+        if unfold.parent().is_some() {
+            unfold.unparent();
+        }
+        clear(&body);
+        let b = &body;
+        let (sx, tx, lat, br) = (&show_exits, &tor_exits, &latency, &bridges);
+
+        if on.is_some() && tor {
+            let c = card();
+            let r = row("dialog-warning-symbolic", "A VPN and Tor are both on", Some("Pick one to keep"));
+            r.append(&row_button("security-high-symbolic", "Keep the VPN", || act(routes::tor_off())));
+            let svc = on.clone();
+            r.append(&row_button("security-medium-symbolic", "Keep Tor", move || {
+                if let Some(s) = svc.clone() {
+                    act(async move { vpn::disconnect(&s).await });
+                }
+            }));
+            c.append(&r);
+            b.append(&c);
+        }
+
+        // Routes: direct, each service, Tor.
+        let c = card();
+        c.append(&choice_row(
+            "security-low-symbolic",
+            "Direct",
+            Some("No VPN: traffic goes straight out"),
+            on.is_none() && !tor,
+            || act(routes::direct()),
+        ));
+        for s in &v.services {
+            let sub = if s.connected {
+                if s.location.is_empty() { "Connected".to_string() } else { format!("Connected · {}", s.location) }
+            } else {
+                "Off".to_string()
+            };
+            let icon_name =
+                if matches!(s.kind, vpn::Kind::Nm { .. }) { "network-vpn-symbolic" } else { "security-high-symbolic" };
+            let svc = s.clone();
+            c.append(&choice_row(icon_name, &s.name, Some(&sub), s.connected, move || {
+                let s = svc.clone();
+                act(async move { vpn::connect(&s, None).await });
+            }));
+        }
+        if st.tor.installed {
+            let sub = if st.tor.connected {
+                let mode = st.tor.mode.map(|m| m.label()).unwrap_or("On");
+                if st.tor.exit_country.is_empty() {
+                    mode.to_string()
+                } else {
+                    format!("{mode} · exit {}", st.tor.exit_country.to_uppercase())
+                }
+            } else if st.tor.running {
+                format!("Starting… {}%", st.tor.bootstrap)
+            } else {
+                "Off".to_string()
+            };
+            c.append(&choice_row("security-medium-symbolic", "Tor", Some(&sub), st.tor.connected, || {
+                act(routes::tor(TorMode::Lan))
+            }));
+        }
+        b.append(&c);
+        if v.services.is_empty() && !st.tor.installed {
+            let l = label("No VPN set up yet. Add one with the button below (Settings › Online Accounts).", "cc-empty");
+            l.set_wrap(true);
+            b.append(&l);
+        }
+
+        // A section per service with locations: where, and (NordVPN) its settings.
+        for s in v.services.iter().filter(|s| s.has_locations()) {
+            b.append(&group(&s.name));
+            let c = card();
+            let open = open_service.borrow().as_deref() == Some(s.id.as_str());
+            let place = if s.connected && !s.location.is_empty() { s.location.clone() } else { "Fastest".to_string() };
+            let r = row("find-location-symbolic", "Location", Some(&place));
+            let (os, rd, id) = (open_service.clone(), redraw.clone(), s.id.clone());
+            r.append(&row_button(if open { "pan-up-symbolic" } else { "pan-down-symbolic" }, "Pick a location", move || {
+                let now = os.borrow().as_deref() == Some(id.as_str());
+                *os.borrow_mut() = if now { None } else { Some(id.clone()) };
+                rd();
+            }));
+            c.append(&r);
+            if open {
+                c.append(&unfold);
             }
+            if s.kind == vpn::Kind::Nord {
+                nord_settings(&c, s, &settings, &technology, &protocol, &redraw);
+            }
+            b.append(&c);
+        }
+        fill();
+        if typing && unfold.parent().is_some() {
+            search.grab_focus();
+            search.set_position(-1);
         }
 
         // Tor: how much goes through it, the exit, a new circuit.
@@ -728,17 +753,15 @@ pub fn vpn_view(back: Rc<dyn Fn()>) -> gtk::Widget {
     root.upcast()
 }
 
-/// NordVPN's switches, pause, technology and protocol.
+/// NordVPN's switches, pause, technology and protocol, into its card.
 fn nord_settings(
-    b: &gtk::Box,
+    c: &gtk::Box,
     s: &vpn::Service,
     ss: &Rc<RefCell<Option<NordSettings>>>,
     tech: &Rc<RefCell<Option<String>>>,
     proto: &Rc<RefCell<Option<String>>>,
     redraw: &(impl Fn() + Clone + 'static),
 ) {
-    b.append(&group("NordVPN"));
-    let c = card();
     if ss.borrow().is_none() {
         let (ss2, rd2) = (ss.clone(), redraw.clone());
         *ss.borrow_mut() = Some(Vec::new());
@@ -846,5 +869,4 @@ fn nord_settings(
         r.append(&seg);
         c.append(&r);
     }
-    b.append(&c);
 }

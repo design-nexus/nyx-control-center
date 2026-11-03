@@ -895,7 +895,7 @@ window.nyx-control-center .cc-upcoming-head image {
 
 window.nyx-control-center .cc-event {
   border-radius: 7px;
-  padding: 4px 9px 5px;
+  padding: 5px 9px;
   background: alpha(@theme_text, 0.06);
 }
 
@@ -937,4 +937,9 @@ window.nyx-control-center .cc-art-box {
 window.nyx-control-center .cc-art-box.empty {
   background: alpha(@theme_text, 0.06);
   color: @theme_text_tertiary;
+}
+
+window.nyx-control-center entry.cc-search-inline,
+window.nyx-control-center searchentry.cc-search-inline {
+  margin: 4px 6px 6px;
 }

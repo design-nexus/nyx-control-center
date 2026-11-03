@@ -837,7 +837,7 @@ fn upcoming(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     let list = gtk::Box::new(gtk::Orientation::Vertical, 4);
     list.set_vexpand(true);
     tile.append(&list);
-    let rows = if size.rows >= 3 { 3 } else { 2 };
+    let rows = if size.cols >= 4 { 4 } else { 3 };
     clickable(&tile, || ui::launch(&["gtk-launch", "io.github.design_nexus.nyx.Calendar.desktop"]));
     let t = tile.clone();
     bind(&tile, calendar::live(), move |st| {
@@ -857,14 +857,20 @@ fn upcoming(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
         // Each event as Calendar's week view draws it: a block in its calendar's colour,
         // the title, and when (and where) below it.
         for e in st.events.iter().take(rows) {
-            let block = gtk::Box::new(gtk::Orientation::Vertical, 0);
+            // One line: the title, and when on the right.
+            let block = gtk::Box::new(gtk::Orientation::Horizontal, 8);
             block.add_css_class("cc-event");
             block.add_css_class(&ui::event_class(e.color.as_deref().unwrap_or("#8a8f98")));
             block.append(&label(&e.title, "cc-event-title"));
-            let when = event_when(e, now);
-            let sub = if e.location.is_empty() { when } else { format!("{when} · {}", e.location) };
-            block.append(&label(&sub, "cc-event-when"));
-            block.set_tooltip_text(Some(&format!("{} — {}", e.title, e.calendar)));
+            let when = gtk::Label::new(Some(&event_when(e, now)));
+            when.add_css_class("cc-event-when");
+            when.set_xalign(1.0);
+            block.append(&when);
+            block.set_tooltip_text(Some(&if e.location.is_empty() {
+                format!("{} ({})", e.title, e.calendar)
+            } else {
+                format!("{} at {} ({})", e.title, e.location, e.calendar)
+            }));
             list.append(&block);
         }
         t.set_tooltip_text(Some("Open Calendar"));
