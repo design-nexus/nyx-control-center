@@ -717,7 +717,7 @@ dependencies = [
 [[package]]
 name = "nyx-plugin"
 version = "0.1.0"
-source = "git+https://github.com/design-nexus/nyx-bar.git?rev=168c1e90eff3643ea8ad47341535b20a6c8190f0#168c1e90eff3643ea8ad47341535b20a6c8190f0"
+source = "git+https://github.com/design-nexus/nyx-bar.git?rev=a6d951dc5155204363b3327f90b16e38e23aa524#a6d951dc5155204363b3327f90b16e38e23aa524"
 dependencies = [
  "anyhow",
  "serde",
@@ -730,7 +730,7 @@ dependencies = [
 [[package]]
 name = "nyx-plugin-host"
 version = "0.1.0"
-source = "git+https://github.com/design-nexus/nyx-bar.git?rev=168c1e90eff3643ea8ad47341535b20a6c8190f0#168c1e90eff3643ea8ad47341535b20a6c8190f0"
+source = "git+https://github.com/design-nexus/nyx-bar.git?rev=a6d951dc5155204363b3327f90b16e38e23aa524#a6d951dc5155204363b3327f90b16e38e23aa524"
 dependencies = [
  "async-channel",
  "libc",
@@ -743,7 +743,7 @@ dependencies = [
 [[package]]
 name = "nyx-plugin-protocol"
 version = "0.1.0"
-source = "git+https://github.com/design-nexus/nyx-bar.git?rev=168c1e90eff3643ea8ad47341535b20a6c8190f0#168c1e90eff3643ea8ad47341535b20a6c8190f0"
+source = "git+https://github.com/design-nexus/nyx-bar.git?rev=a6d951dc5155204363b3327f90b16e38e23aa524#a6d951dc5155204363b3327f90b16e38e23aa524"
 dependencies = [
  "serde",
  "serde_json",
@@ -752,7 +752,7 @@ dependencies = [
 [[package]]
 name = "nyx-plugin-view"
 version = "0.1.0"
-source = "git+https://github.com/design-nexus/nyx-bar.git?rev=168c1e90eff3643ea8ad47341535b20a6c8190f0#168c1e90eff3643ea8ad47341535b20a6c8190f0"
+source = "git+https://github.com/design-nexus/nyx-bar.git?rev=a6d951dc5155204363b3327f90b16e38e23aa524#a6d951dc5155204363b3327f90b16e38e23aa524"
 dependencies = [
  "gtk4",
  "nyx-plugin-protocol",
