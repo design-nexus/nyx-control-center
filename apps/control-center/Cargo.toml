@@ -8,9 +8,15 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
+async-channel = "2"
 gtk = { version = "0.11", package = "gtk4", features = ["v4_18"] }
 gtk4-layer-shell = "0.8"
 nyx-desktop = { git = "https://github.com/design-nexus/nyx-core.git", rev = "44d4d4c8009259b4ea7d7d0f564319ea9a1ce684" }
+# The plugin system lives in nyx-bar until it moves to nyx-core and nyx-design.
+nyx-plugin = { git = "https://github.com/design-nexus/nyx-bar.git", rev = "168c1e90eff3643ea8ad47341535b20a6c8190f0" }
+nyx-plugin-host = { git = "https://github.com/design-nexus/nyx-bar.git", rev = "168c1e90eff3643ea8ad47341535b20a6c8190f0" }
+nyx-plugin-protocol = { git = "https://github.com/design-nexus/nyx-bar.git", rev = "168c1e90eff3643ea8ad47341535b20a6c8190f0" }
+nyx-plugin-view = { git = "https://github.com/design-nexus/nyx-bar.git", rev = "168c1e90eff3643ea8ad47341535b20a6c8190f0" }
 nyx-providers = { path = "../../crates/nyx-providers" }
 nyx-theme = { git = "https://github.com/design-nexus/nyx-design.git", rev = "976fed940841a2a505ffe644f632cb60e12988a8" }
 nyx-widgets = { path = "../../crates/nyx-widgets" }

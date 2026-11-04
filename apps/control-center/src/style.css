@@ -952,3 +952,38 @@ window.nyx-control-center button.cc-star.on {
 window.nyx-control-center button.cc-default-mark.on {
   color: @cc_green;
 }
+
+/* ---------- Plugin tiles ---------- */
+
+/* A plugin's own view: the tile's frame and colours, with room inside. */
+window.nyx-control-center .cc-plugin-view {
+  padding: 8px 10px;
+}
+
+window.nyx-control-center .cc-plugin-view label {
+  font-feature-settings: "tnum";
+}
+
+/* A placed plugin tile whose plugin isn't available (edit mode only). */
+window.nyx-control-center .cc-placeholder {
+  background: none;
+  border: 1px dashed alpha(@theme_text, 0.18);
+}
+
+window.nyx-control-center .cc-plugin-detail {
+  margin-top: 6px;
+}
+
+window.nyx-control-center .cc-plugin-detail .plugin-row {
+  padding: 6px 8px;
+  border-radius: 7px;
+}
+
+window.nyx-control-center .cc-plugin-detail .plugin-row:hover {
+  background: alpha(@theme_text, 0.05);
+}
+
+window.nyx-control-center .monospace {
+  font-family: "JetBrainsMono Nerd Font", monospace;
+  font-size: 12px;
+}

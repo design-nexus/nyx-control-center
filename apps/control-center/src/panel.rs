@@ -29,6 +29,9 @@ pub struct Config {
     /// Which layout format the file was written in (missing: the first).
     #[serde(default)]
     pub version: u32,
+    /// Settings for plugin tiles, per plugin; `limits` inside is the plugin's limits.
+    #[serde(default, skip_serializing_if = "std::collections::BTreeMap::is_empty")]
+    pub plugins: std::collections::BTreeMap<String, toml::Table>,
 }
 
 const LAYOUT_VERSION: u32 = 3;
@@ -84,10 +87,10 @@ pub fn load_config() -> Config {
         }
         Ok(Err(e)) => {
             eprintln!("nyx-control-center: {}: {e}; using the default layout", path.display());
-            Config { pages: tiles::default_pages(), remember_page: true, version: LAYOUT_VERSION }
+            Config { pages: tiles::default_pages(), remember_page: true, version: LAYOUT_VERSION, plugins: Default::default() }
         }
         _ => {
-            let c = Config { pages: tiles::default_pages(), remember_page: true, version: LAYOUT_VERSION };
+            let c = Config { pages: tiles::default_pages(), remember_page: true, version: LAYOUT_VERSION, plugins: Default::default() };
             if let Some(dir) = path.parent() {
                 let _ = std::fs::create_dir_all(dir);
             }
@@ -138,10 +141,16 @@ impl Panel {
         self.content.set_visible_child_name("dashboard");
         self.catcher.present();
         self.window.present();
-        if let Some(p) = self.panel1.borrow().as_ref() {
+        // Other panels close when one opens; a test copy leaves the real ones alone.
+        if self.only.is_none()
+            && let Some(p) = self.panel1.borrow().as_ref()
+        {
             p.announce();
         }
-        // For screenshots: edit mode, or a detail view, straight away.
+        // For screenshots: a page, edit mode, or a detail view, straight away.
+        if let Some(page) = std::env::var("NYX_CC_TEST_PAGE").ok().and_then(|p| p.parse::<usize>().ok()) {
+            self.go_to(page);
+        }
         if std::env::var_os("NYX_CC_TEST_EDIT").is_some() {
             self.set_editing(true);
         }
@@ -276,6 +285,10 @@ impl Panel {
     }
 
     fn save(&self) {
+        {
+            let c = self.config.borrow();
+            crate::plugin_tiles::set_layout(&c.pages, &c.plugins);
+        }
         let path = config_path();
         if let Some(dir) = path.parent() {
             let _ = std::fs::create_dir_all(dir);
@@ -343,6 +356,8 @@ impl Panel {
         }
         let used: Vec<String> =
             self.config.borrow().pages.iter().flat_map(|p| p.tiles.iter().map(|t| t.widget.clone())).collect();
+        // Plugin tiles first: a plugin just installed is what's most likely wanted.
+        self.fill_tray_plugins(&used);
         let free: Vec<tiles::Kind> = tiles::kinds().into_iter().filter(|k| !used.iter().any(|u| u == k.id)).collect();
         let head = gtk::Label::new(Some(if free.is_empty() { "EVERY WIDGET IS ON A PAGE" } else { "ADD WIDGETS" }));
         head.add_css_class("cc-group");
@@ -389,6 +404,92 @@ impl Panel {
             }
         }
         self.tray.append(&grid);
+    }
+
+    /// The tray's **From plugins** group: plugin tiles turned on but not placed, then
+    /// plugins whose tiles aren't turned on (the Control Center never approves a
+    /// plugin's permissions itself).
+    fn fill_tray_plugins(&self, used: &[String]) {
+        let free: Vec<crate::plugin_tiles::PluginKind> =
+            crate::plugin_tiles::kinds().into_iter().filter(|k| !used.contains(&k.id)).collect();
+        let off = crate::plugin_tiles::off();
+        if free.is_empty() && off.is_empty() {
+            return;
+        }
+        let head = gtk::Label::new(Some("FROM PLUGINS"));
+        head.add_css_class("cc-group");
+        head.set_xalign(0.0);
+        self.tray.append(&head);
+        if !free.is_empty() {
+            let grid = gtk::FlowBox::new();
+            grid.add_css_class("cc-tray");
+            grid.set_selection_mode(gtk::SelectionMode::None);
+            grid.set_min_children_per_line(3);
+            grid.set_max_children_per_line(3);
+            grid.set_homogeneous(true);
+            grid.set_column_spacing(8);
+            grid.set_row_spacing(8);
+            for k in free {
+                let card = gtk::Box::new(gtk::Orientation::Vertical, 6);
+                card.add_css_class("cc-tray-card");
+                let top = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                let (chip, _) = ui::chip(&k.icon);
+                top.append(&chip);
+                let spacer = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                spacer.set_hexpand(true);
+                top.append(&spacer);
+                let add = ui::icon_button("list-add-symbolic", &format!("Add {}", k.name));
+                add.add_css_class("cc-tray-add");
+                top.append(&add);
+                card.append(&top);
+                card.append(&label(&k.name, "cc-title"));
+                let sizes: Vec<String> = k.sizes.iter().map(|s| s.to_string().replace('x', "×")).collect();
+                card.append(&label(&sizes.join(" · "), "cc-status"));
+                let (me, id, size) = (self.me.borrow().clone(), k.id.clone(), k.sizes[0]);
+                add.connect_clicked(move |_| {
+                    if let Some(p) = me.upgrade() {
+                        let page = p.page.get();
+                        p.edit(|pages| {
+                            if let Some(pg) = pages.get_mut(page) {
+                                pg.tiles.push(layout::Tile::new(&id, size));
+                            }
+                        });
+                    }
+                });
+                grid.insert(&card, -1);
+                if let Some(child) = grid.last_child() {
+                    child.set_focusable(false);
+                }
+            }
+            self.tray.append(&grid);
+        }
+        if !off.is_empty() {
+            let note = label("Turn on in a terminal:", "cc-status");
+            note.set_margin_top(8);
+            self.tray.append(&note);
+            for (id, name) in off {
+                let l = label(&format!("nyx plugin configure {id}"), "cc-status");
+                l.add_css_class("monospace");
+                l.set_tooltip_text(Some(&name));
+                l.set_selectable(true);
+                self.tray.append(&l);
+            }
+        }
+    }
+
+    /// The layout file changed on disk (`nyx plugin` placed a tile): show it.
+    fn reload_config(&self) {
+        let path = config_path();
+        let Ok(Ok(c)) = std::fs::read_to_string(&path).map(|t| toml::from_str::<Config>(&t)) else { return };
+        if c.pages.is_empty() || *self.config.borrow() == c {
+            return;
+        }
+        *self.config.borrow_mut() = c;
+        {
+            let c = self.config.borrow();
+            crate::plugin_tiles::set_layout(&c.pages, &c.plugins);
+        }
+        self.rebuild();
     }
 
     fn open_detail(&self, which: Detail, back: Rc<dyn Fn()>) {
@@ -594,6 +695,31 @@ pub fn build(app: &gtk::Application, only: Option<String>) -> Rc<Panel> {
     column.append(&dots);
     content.add_named(&column, Some("dashboard"));
     root.append(&content);
+    let w = weak.clone();
+    crate::plugin_tiles::start(
+        panel.only.is_some(),
+        Rc::new(move || {
+            if let Some(p) = w.upgrade() {
+                p.rebuild();
+            }
+        }),
+    );
+    {
+        let c = panel.config.borrow();
+        crate::plugin_tiles::set_layout(&c.pages, &c.plugins);
+    }
+    let w = weak.clone();
+    if let Ok(m) = gio::File::for_path(config_path()).monitor_file(gio::FileMonitorFlags::WATCH_MOVES, gio::Cancellable::NONE) {
+        m.connect_changed(move |_, _, _, ev| {
+            if matches!(ev, gio::FileMonitorEvent::ChangesDoneHint | gio::FileMonitorEvent::Created | gio::FileMonitorEvent::MovedIn | gio::FileMonitorEvent::Renamed)
+                && let Some(p) = w.upgrade()
+            {
+                p.reload_config();
+            }
+        });
+        // Lives as long as the panel, which lives as long as the app.
+        std::mem::forget(m);
+    }
     panel.rebuild();
     panel.go_to(0);
 
@@ -668,6 +794,9 @@ pub fn build(app: &gtk::Application, only: Option<String>) -> Rc<Panel> {
         }
     });
 
+    if let Some(conn) = app.dbus_connection() {
+        crate::plugin_tiles::serve(&conn, panel.only.is_some());
+    }
     // Never with the Notification Center: opening one closes the other.
     if let Some(conn) = app.dbus_connection() {
         let (w1, w2, w3) = (weak.clone(), weak.clone(), weak.clone());
@@ -804,13 +933,24 @@ fn page_grid(ctx: &Ctx, page: &Page, page_index: usize, editing: bool, panel: st
     grid.set_column_spacing(8);
     grid.set_row_spacing(8);
     grid.set_valign(gtk::Align::Start);
-    // Unknown widgets (from a newer version, or a typo) are skipped, not fatal.
-    let known: Vec<(usize, &layout::Tile, tiles::Kind)> =
-        page.tiles.iter().enumerate().filter_map(|(i, t)| tiles::kind(&t.widget).map(|k| (i, t, k))).collect();
-    let sizes: Vec<layout::Size> =
-        known.iter().map(|(_, t, k)| if k.sizes.contains(&t.size) { t.size } else { k.sizes[0] }).collect();
+    // Unknown widgets (from a newer version, or a typo) are skipped, not fatal; plugin
+    // tiles that aren't available show only in edit mode, to be moved or removed.
+    let known: Vec<(usize, &layout::Tile, tiles::AnyKind)> = page
+        .tiles
+        .iter()
+        .enumerate()
+        .filter_map(|(i, t)| tiles::AnyKind::find(&t.widget, t.size).map(|k| (i, t, k)))
+        .filter(|(_, _, k)| editing || !k.is_missing())
+        .collect();
+    let sizes: Vec<layout::Size> = known
+        .iter()
+        .map(|(_, t, k)| {
+            let sizes = k.sizes();
+            if sizes.contains(&t.size) { t.size } else { sizes[0] }
+        })
+        .collect();
     for ((index, t, k), at) in known.iter().zip(layout::pack(&sizes)) {
-        let tile = (k.build)(ctx, at.size, t);
+        let tile = k.build(ctx, at.size, t);
         let w: gtk::Widget = if editing { edit_cell(tile, *index, page_index, k, at.size, &panel) } else { tile };
         grid.attach(&w, at.col as i32, at.row as i32, at.size.cols as i32, at.size.rows as i32);
     }
@@ -832,15 +972,16 @@ fn edit_cell(
     tile: gtk::Widget,
     index: usize,
     page: usize,
-    kind: &tiles::Kind,
+    kind: &tiles::AnyKind,
     size: layout::Size,
     panel: &std::rc::Weak<Panel>,
 ) -> gtk::Widget {
+    let (name, sizes) = (kind.name(), kind.sizes());
     tile.set_can_target(false);
     let cell = gtk::Overlay::new();
     cell.add_css_class("cc-edit-cell");
     cell.set_child(Some(&tile));
-    let remove = icon_button("window-close-symbolic", &format!("Remove {}", kind.name));
+    let remove = icon_button("window-close-symbolic", &format!("Remove {name}"));
     remove.add_css_class("cc-edit-remove");
     remove.set_halign(gtk::Align::Start);
     remove.set_valign(gtk::Align::Start);
@@ -853,8 +994,8 @@ fn edit_cell(
         }
     });
     cell.add_overlay(&remove);
-    if kind.sizes.len() > 1 {
-        let next = layout::next_size(kind.sizes, size);
+    if sizes.len() > 1 {
+        let next = layout::next_size(&sizes, size);
         let resize = icon_button("view-fullscreen-symbolic", &format!("Size {size} (click for {next})").replace('x', "×"));
         resize.add_css_class("cc-edit-resize");
         resize.set_halign(gtk::Align::End);
@@ -902,6 +1043,7 @@ mod tests {
             ],
             remember_page: true,
             version: 0,
+            plugins: Default::default(),
         };
         assert!(migrate(&mut c));
         let first: Vec<&str> = c.pages[0].tiles.iter().map(|t| t.widget.as_str()).collect();

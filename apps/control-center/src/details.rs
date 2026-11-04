@@ -16,6 +16,7 @@ pub fn view(which: Detail, back: Rc<dyn Fn()>) -> gtk::Widget {
         Detail::Tailscale => crate::route_tiles::tailscale_view(back),
         Detail::Display => display_view(back),
         Detail::Battery => battery_view(back),
+        Detail::Plugin(n) => crate::plugin_tiles::detail_view(n, back),
     }
 }
 

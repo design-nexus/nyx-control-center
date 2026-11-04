@@ -113,6 +113,24 @@ sizes they come in:
 | `battery` | 1x1, 2x1 |
 | `dnd`, `mode`, `night-light`, `keep-awake`, `keyboard-light`, `microphone`, `capture` | 1x1 |
 
+### Plugin tiles
+
+Nyx plugins (see nyx-bar's [`docs/plugins.md`](https://github.com/design-nexus/nyx-bar/blob/main/docs/plugins.md))
+can add tiles and detail views, with no rebuild: `plugin:<plugin>/<part>` widgets. Turn
+one on with `nyx plugin enable <plugin>/<part> --kind control-center`, which puts it at
+the end of the last page, or add it in edit mode under **From plugins**. A plugin runs
+while its tile is on screen and stops two minutes after the panel closes; third-party
+plugins are sandboxed. Their settings go in the layout file:
+
+```toml
+[plugins."example.cc-ping"]
+host = "9.9.9.9"
+```
+
+`io.github.design_nexus.nyx.ControlCenterPlugins1` at
+`/io/github/design_nexus/nyx/ControlCenter/Plugins` lists them with their memory and CPU
+(`ListPlugins`), and has `RestartPlugin` and `Reload`.
+
 ## Build
 
 ```sh

@@ -33,10 +33,15 @@ pub enum Detail {
     Tailscale,
     Display,
     Battery,
+    /// A plugin tile's detail view (see `plugin_tiles::intern`).
+    Plugin(u16),
 }
 
 impl Detail {
     pub fn parse(s: &str) -> Option<Detail> {
+        if s.starts_with(crate::plugin_tiles::PREFIX) {
+            return crate::plugin_tiles::parse_detail(s).map(Detail::Plugin);
+        }
         match s {
             "wifi" => Some(Detail::Wifi),
             "bluetooth" => Some(Detail::Bluetooth),
@@ -143,6 +148,55 @@ pub fn kinds() -> Vec<Kind> {
 
 pub fn kind(id: &str) -> Option<Kind> {
     kinds().into_iter().find(|k| k.id == id)
+}
+
+/// A tile in the layout: native, from a plugin, or from a plugin that isn't available.
+pub enum AnyKind {
+    Native(Kind),
+    Plugin(crate::plugin_tiles::PluginKind),
+    /// Shown only in edit mode, so it can be moved or removed.
+    Missing(String, Size),
+}
+
+impl AnyKind {
+    /// What a layout id names; `None` for unknown native ids (a newer version, a typo).
+    pub fn find(id: &str, size: Size) -> Option<AnyKind> {
+        if id.starts_with(crate::plugin_tiles::PREFIX) {
+            return Some(match crate::plugin_tiles::kind(id) {
+                Some(k) => AnyKind::Plugin(k),
+                None => AnyKind::Missing(id.to_string(), size),
+            });
+        }
+        kind(id).map(AnyKind::Native)
+    }
+
+    pub fn name(&self) -> String {
+        match self {
+            AnyKind::Native(k) => k.name.to_string(),
+            AnyKind::Plugin(k) => k.name.clone(),
+            AnyKind::Missing(id, _) => crate::plugin_tiles::missing_name(id),
+        }
+    }
+
+    pub fn sizes(&self) -> Vec<Size> {
+        match self {
+            AnyKind::Native(k) => k.sizes.to_vec(),
+            AnyKind::Plugin(k) => k.sizes.clone(),
+            AnyKind::Missing(_, size) => vec![*size],
+        }
+    }
+
+    pub fn is_missing(&self) -> bool {
+        matches!(self, AnyKind::Missing(..))
+    }
+
+    pub fn build(&self, ctx: &Ctx, size: Size, tile: &Tile) -> gtk::Widget {
+        match self {
+            AnyKind::Native(k) => (k.build)(ctx, size, tile),
+            AnyKind::Plugin(k) => crate::plugin_tiles::build(k, ctx, size),
+            AnyKind::Missing(id, _) => crate::plugin_tiles::placeholder(id, size),
+        }
+    }
 }
 
 /// The first-start layout (the approved mockup, without Home until it has an API).

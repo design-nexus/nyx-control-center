@@ -9,6 +9,7 @@ mod backup_tile;
 mod details;
 mod home_tile;
 mod panel;
+mod plugin_tiles;
 mod route_tiles;
 mod theme;
 mod tiles;

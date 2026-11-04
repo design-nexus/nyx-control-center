@@ -1,8 +1,31 @@
 # Plan: plugin tiles in the Control Center
 
-Status: proposed (2026-11-03). Depends on the shared plugin system from the Nyx Bar plan
-(`nyx-bar/docs/PLAN.md`). Desktop widgets follow in
-`nyx/docs/desktop/DESKTOP_WIDGETS_PLAN.md`.
+Status: built (2026-11-03). Depends on the shared plugin system from the Nyx Bar plan
+(`nyx-bar/docs/PLAN.md`). Desktop widgets are in `nyxos-project/nyx-desktop-widgets`.
+
+### Built, and where it differs
+
+- Steps 2 to 8, except as below. The crate move (step 1) waits: the Control Center
+  pins nyx-bar's plugin crates.
+- No new `control_center` messages. A tile is an item, as in the bar; the `widgets`
+  list (in `hello` and its own message, shared with desktop widgets) gives each
+  placed tile's size; the part's popover is its detail view, with `popover_open` and
+  `popover_close`. One plugin can then serve the bar, the desktop and the Control
+  Center with the same code.
+- Instead of `cc.toggle` and `cc.split` view nodes, an item without a view is drawn
+  as the native toggle (or split, with `detail = true` and a popover), from its
+  `icon`, `text` and `on` class. Parts give `icon`, `swatch` and `detail` in the
+  manifest.
+- **From plugins** comes first in the tray. Tiles placed by `nyx plugin` show while
+  the panel is open (it watches the layout file).
+- A test copy (`--only`) no longer announces itself to the other panels, so it never
+  closes the real Notification Center; `NYX_CC_TEST_PAGE=<n>` opens it on a page.
+
+### Not yet
+
+- The stronger `system_talk` warnings in `nyx plugin`'s permission review.
+- Frames capped at 30 fps for tiles (the shared limits apply).
+- Spin and flood tests with a Control Center tile (the bar's cover the shared host).
 
 ## Goal
 
