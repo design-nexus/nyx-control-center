@@ -352,7 +352,9 @@ fn ensure_running(h: &Rc<Host>, id: &str) {
     let state = State::load();
     let parts = state.enabled_parts(&p.manifest, Kind::ControlCenter);
     let settings = settings_for(h, id, &p.manifest.settings);
-    let limits = Limits::resolve(p.trust.is_trusted(), &p.manifest.limits, h.settings.borrow().get(id).and_then(|t| t.get("limits")).and_then(|l| l.as_table()));
+    let mut limits = Limits::resolve(p.trust.is_trusted(), &p.manifest.limits, h.settings.borrow().get(id).and_then(|t| t.get("limits")).and_then(|l| l.as_table()));
+    // Tiles are small and the panel is a glance: 30 frames a second is plenty.
+    limits.fps = limits.fps.min(30);
     let widgets = widgets_for(h, id, &parts);
     let hello = Hello {
         api_version: API_VERSION,
@@ -544,7 +546,11 @@ fn on_message(h: &Rc<Host>, id: &str, msg: PluginMsg) {
         }
         PluginMsg::Log { level, message } => eprintln!("[{id}] {level:?}: {message}"),
         PluginMsg::FrameReady { item, node, buffer } => {
-            let Some(b) = h.plugins.borrow().get(id).and_then(|r| r.frames.get(&(item.clone(), node.clone())).cloned()) else { return };
+            // Frames only while the panel shows them.
+            let Some(b) = h.plugins.borrow().get(id).filter(|r| r.visible).and_then(|r| r.frames.get(&(item.clone(), node.clone())).cloned())
+            else {
+                return;
+            };
             let Some(map) = b.maps.get(buffer as usize) else { return };
             for t in live_tiles(h).iter().filter(|t| t.plugin == id) {
                 if let Some(r) = t.rendered.borrow().as_ref()

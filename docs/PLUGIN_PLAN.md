@@ -21,11 +21,18 @@ Status: built (2026-11-03). Depends on the shared plugin system from the Nyx Bar
 - A test copy (`--only`) no longer announces itself to the other panels, so it never
   closes the real Notification Center; `NYX_CC_TEST_PAGE=<n>` opens it on a page.
 
+### Done since
+
+- `nyx plugin` names each system change a plugin could make (and system services it
+  doesn't know), defaults to no, and needs `--allow-system` beside `--yes`.
+- Tiles' frames are capped at 30 a second and dropped while the panel is hidden.
+- Spin and flood tiles, measured: the spinner stays at its 10% cap; under the flood the
+  Control Center used 11% CPU until the host learned to stop reading a plugin that's
+  far over its rate (now 0.6%), and the panel answered D-Bus in 4 to 6 ms throughout.
+
 ### Not yet
 
-- The stronger `system_talk` warnings in `nyx plugin`'s permission review.
-- Frames capped at 30 fps for tiles (the shared limits apply).
-- Spin and flood tests with a Control Center tile (the bar's cover the shared host).
+- The crate move (step 1).
 
 ## Goal
 
