@@ -5,8 +5,7 @@ Status: built (2026-11-03). Depends on the shared plugin system from the Nyx Bar
 
 ### Built, and where it differs
 
-- Steps 2 to 8, except as below. The crate move (step 1) waits: the Control Center
-  pins nyx-bar's plugin crates.
+- Steps 2 to 8, except as below; step 1 followed (see below).
 - No new `control_center` messages. A tile is an item, as in the bar; the `widgets`
   list (in `hello` and its own message, shared with desktop widgets) gives each
   placed tile's size; the part's popover is its detail view, with `popover_open` and
@@ -30,9 +29,9 @@ Status: built (2026-11-03). Depends on the shared plugin system from the Nyx Bar
   Control Center used 11% CPU until the host learned to stop reading a plugin that's
   far over its rate (now 0.6%), and the panel answered D-Bus in 4 to 6 ms throughout.
 
-### Not yet
-
-- The crate move (step 1).
+- The crate move (step 1): the plugin crates are in nyx-core (e478d83) and
+  `nyx-plugin-view` in nyx-design (aec4b03); the Control Center pins those, with
+  nyx-theme from the same nyx-design revision so there's one copy of it.
 
 ## Goal
 

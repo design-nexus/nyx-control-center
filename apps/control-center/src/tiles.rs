@@ -546,11 +546,11 @@ fn capture(ctx: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     let (tile, _, _, status) = toggle(size, "camera-photo-symbolic", "Capture", move || {
         hide();
         // Let the panel get out of the picture first.
-        glib::timeout_add_local_once(std::time::Duration::from_millis(250), || ui::launch(&["omarchy-capture-screenshot"]));
+        glib::timeout_add_local_once(std::time::Duration::from_millis(250), || ui::launch(&["nyx-capture", "--capture"]));
     });
     status.set_text("Screenshot");
     tint(&tile, "pink");
-    tile.set_tooltip_text(Some("Screenshot: closes this panel, then pick an area, a window or the screen"));
+    tile.set_tooltip_text(Some("Screenshot: closes this panel and opens the capture bar"));
     tile.upcast()
 }
 
