@@ -274,7 +274,7 @@ pub fn tailscale_view(back: Rc<dyn Fn()>) -> gtk::Widget {
             let (ip2, dns, name) = (ip.clone(), p.dns.clone(), p.dns.clone());
             r.append(&row_button("edit-copy-symbolic", &format!("Copy {}'s address ({ip})", p.name), move || copy(&ip2)));
             r.append(&row_button("insert-link-symbolic", &format!("Copy {}'s name ({})", p.name, p.dns), move || copy(&dns)));
-            if p.online {
+            if p.online && nyx_providers::omarchy::here() {
                 r.append(&row_button("document-send-symbolic", &format!("Send files to {}", p.name), move || {
                     ui::launch(&["omarchy-tailscale-send", &name]);
                 }));

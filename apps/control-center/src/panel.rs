@@ -120,6 +120,8 @@ pub struct Panel {
     panel1: RefCell<Option<nyx_desktop::panel::Panel>>,
     /// The detail view last opened.
     detail: Cell<Option<Detail>>,
+    /// A player has a song or video: Now playing is left out of the pages without one.
+    has_player: Cell<bool>,
 }
 
 impl Panel {
@@ -624,6 +626,7 @@ pub fn build(app: &gtk::Application, only: Option<String>) -> Rc<Panel> {
         me: RefCell::default(),
         panel1: RefCell::default(),
         detail: Cell::new(None),
+        has_player: Cell::new(false),
     });
     *panel.me.borrow_mut() = Rc::downgrade(&panel);
 
@@ -722,6 +725,22 @@ pub fn build(app: &gtk::Application, only: Option<String>) -> Rc<Panel> {
     }
     panel.rebuild();
     panel.go_to(0);
+    // A hidden tile would leave its rows empty in the grid, so the pages are drawn
+    // again without it (after this signal, not inside it).
+    let w = weak.clone();
+    bind(&window, nyx_providers::media::live(), move |st| {
+        let has = !st.player.is_empty() && !(st.title.is_empty() && st.artist.is_empty());
+        let Some(p) = w.upgrade() else { return };
+        if p.has_player.replace(has) == has || p.editing.get() {
+            return;
+        }
+        let w = w.clone();
+        glib::idle_add_local_once(move || {
+            if let Some(p) = w.upgrade() {
+                p.rebuild();
+            }
+        });
+    });
 
     // Swipe or scroll sideways to change page.
     let swipe = gtk::GestureSwipe::new();
@@ -868,9 +887,13 @@ fn header(ctx: &Ctx, panel: std::rc::Weak<Panel>) -> (gtk::Widget, gtk::Box, gtk
     });
     let power_button = icon_button("system-shutdown-symbolic", "Lock, suspend, restart, shut down");
     let hide = ctx.hide.clone();
-    power_button.connect_clicked(move |_| {
-        hide();
-        ui::launch(&["omarchy-menu", "toggle", "system"]);
+    power_button.connect_clicked(move |b| {
+        if nyx_providers::omarchy::here() {
+            hide();
+            ui::launch(&["omarchy-menu", "toggle", "system"]);
+        } else {
+            details::power_popover(b, hide.clone());
+        }
     });
     let normal = gtk::Box::new(gtk::Orientation::Horizontal, 2);
     let edit = icon_button("document-edit-symbolic", "Edit the dashboard");
@@ -941,6 +964,7 @@ fn page_grid(ctx: &Ctx, page: &Page, page_index: usize, editing: bool, panel: st
         .enumerate()
         .filter_map(|(i, t)| tiles::AnyKind::find(&t.widget, t.size).map(|k| (i, t, k)))
         .filter(|(_, _, k)| editing || !k.is_missing())
+        .filter(|(_, t, _)| editing || t.widget != "media" || panel.upgrade().is_none_or(|p| p.has_player.get()))
         .collect();
     let sizes: Vec<layout::Size> = known
         .iter()

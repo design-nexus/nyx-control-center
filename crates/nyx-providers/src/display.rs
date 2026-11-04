@@ -73,6 +73,37 @@ pub fn parse_screens(state: &str) -> Vec<Screen> {
         .collect()
 }
 
+/// `hyprctl monitors all -j`: the screens and the focused one's scale (without Omarchy).
+pub fn parse_hypr_monitors(json: &str) -> (Vec<Screen>, f64) {
+    let v: Vec<serde_json::Value> = serde_json::from_str(json).unwrap_or_default();
+    let scale = v.iter().find(|m| m["focused"].as_bool() == Some(true)).and_then(|m| m["scale"].as_f64()).unwrap_or(1.0);
+    let screens = v
+        .iter()
+        .filter_map(|m| {
+            let name = m["name"].as_str()?.to_string();
+            if name.starts_with("HEADLESS-") {
+                return None;
+            }
+            Some(Screen {
+                internal: is_internal(&name),
+                focused: m["focused"].as_bool().unwrap_or(false),
+                enabled: !m["disabled"].as_bool().unwrap_or(false),
+                width: m["width"].as_u64().unwrap_or(0) as u32,
+                height: m["height"].as_u64().unwrap_or(0) as u32,
+                brightness: None,
+                name,
+            })
+        })
+        .collect();
+    (screens, scale)
+}
+
+/// The laptop panel's backlight from `brightnessctl -m`: `device,backlight,now,50%,max`.
+fn parse_backlight(line: &str) -> Option<f64> {
+    let pct = line.split(',').nth(3)?.trim_end_matches('%').parse::<f64>().ok()?;
+    Some((pct / 100.0).clamp(0.0, 1.0))
+}
+
 /// `text size: 12 px` (or `12 (default)`).
 pub fn parse_text_size(text: &str) -> Option<u32> {
     let line = text.lines().find(|l| l.starts_with("text size:"))?;
@@ -93,6 +124,19 @@ fn start(set: Setter<State>) -> Box<dyn Stop> {
 }
 
 pub fn refresh(set: Setter<State>) {
+    if !crate::omarchy::here() {
+        // Hyprland's screens; only the laptop panel's brightness can be set.
+        glib::MainContext::default().spawn_local(async move {
+            let (mut screens, scale) =
+                output(&["hyprctl", "monitors", "all", "-j"]).await.map(|t| parse_hypr_monitors(&t)).unwrap_or_default();
+            let backlight = output(&["brightnessctl", "-m", "-c", "backlight", "info"]).await.and_then(|l| parse_backlight(&l));
+            for s in screens.iter_mut().filter(|s| s.internal && s.enabled) {
+                s.brightness = backlight;
+            }
+            set.set(State { screens, scale, text_px: TEXT_DEFAULT });
+        });
+        return;
+    }
     glib::MainContext::default().spawn_local(async move {
         let mut screens = output(&["omarchy-monitor-state"]).await.map(|t| parse_screens(&t)).unwrap_or_default();
         for s in screens.iter_mut().filter(|s| s.enabled) {
@@ -114,7 +158,13 @@ async fn then_refresh(r: Result<(), String>) -> Result<(), String> {
 
 pub async fn set_brightness(screen: &str, v: f64) -> Result<(), String> {
     let pct = format!("{}%", (v.clamp(0.01, 1.0) * 100.0).round().max(1.0) as u32);
-    let r = run(&["omarchy-brightness-display", "--monitor", screen, "--no-osd", &pct], None).await;
+    let r = if crate::omarchy::here() {
+        run(&["omarchy-brightness-display", "--monitor", screen, "--no-osd", &pct], None).await
+    } else if is_internal(screen) {
+        run(&["brightnessctl", "-q", "-c", "backlight", "set", &pct], None).await
+    } else {
+        Err("this screen's brightness can't be set here".into())
+    };
     // The sound tile's slider shows the focused screen's.
     crate::brightness::refresh(crate::brightness::live().setter());
     r
@@ -134,6 +184,24 @@ pub async fn set_text_size(px: u32) -> Result<(), String> {
 /// Turn the laptop's own screen on or off (off only while another screen is on).
 pub async fn set_internal(on: bool) -> Result<(), String> {
     then_refresh(run(&["omarchy-hyprland-monitor-internal", if on { "on" } else { "off" }], None).await).await
+}
+
+#[cfg(test)]
+mod hypr_tests {
+    use super::*;
+
+    #[test]
+    fn screens_from_hyprland() {
+        let json = r#"[{"name":"eDP-1","focused":true,"disabled":false,"width":2560,"height":1600,"scale":1.6},
+            {"name":"DP-2","focused":false,"disabled":true,"width":3840,"height":2160,"scale":1.0},
+            {"name":"HEADLESS-1","focused":false,"disabled":false,"width":800,"height":600,"scale":1.0}]"#;
+        let (screens, scale) = parse_hypr_monitors(json);
+        assert_eq!(scale, 1.6);
+        assert_eq!(screens.len(), 2);
+        assert!(screens[0].internal && screens[0].focused && screens[0].enabled);
+        assert!(!screens[1].internal && !screens[1].enabled);
+        assert_eq!(parse_backlight("intel_backlight,backlight,12000,50%,24000"), Some(0.5));
+    }
 }
 
 #[cfg(test)]

@@ -150,7 +150,13 @@ fn wifi(back: Rc<dyn Fn()>) -> gtk::Widget {
     qr.connect_clicked(|_| nyx_providers::dns::share_qr());
     let settings = icon_button("emblem-system-symbolic", "Wi-Fi settings");
     settings.connect_clicked(|_| ui::open_settings("wifi"));
-    root.append(&foot(&[rescan, speed, qr, settings]));
+    // The speed test and the QR code are Omarchy's.
+    let mut buttons = vec![rescan];
+    if nyx_providers::omarchy::here() {
+        buttons.extend([speed, qr]);
+    }
+    buttons.push(settings);
+    root.append(&foot(&buttons));
     let e = extras.clone();
     bind(&root, nyx_providers::dns::live(), move |st| wifi_extras(&e, st));
 
@@ -706,6 +712,11 @@ fn display_view(back: Rc<dyn Fn()>) -> gtk::Widget {
         }
 
         clear(&rest);
+        // Scale, text size and the laptop screen go through Omarchy's commands, which
+        // keep the change; Settings' Displays page sets them elsewhere.
+        if !nyx_providers::omarchy::here() {
+            return;
+        }
         // Scale of the focused screen.
         let focused = st.screens.iter().find(|s| s.focused).map(|s| s.name.clone()).unwrap_or_default();
         rest.append(&group(&format!(
@@ -910,5 +921,33 @@ pub fn volume_popover(anchor: &gtk::Button) {
         let p = p.clone();
         glib::idle_add_local_once(move || p.unparent());
     });
+    pop.popup();
+}
+
+/// Lock, log out, restart and shut down, where Omarchy's system menu isn't installed.
+pub fn power_popover(anchor: &gtk::Button, hide: Rc<dyn Fn()>) {
+    let pop = gtk::Popover::new();
+    pop.add_css_class("cc-popover");
+    let c = card();
+    let log_out: &[&str] = if nyx_providers::present("uwsm") { &["uwsm", "stop"] } else { &["hyprctl", "dispatch", "exit"] };
+    let actions: [(&str, &str, &[&str]); 4] = [
+        ("system-lock-screen-symbolic", "Lock", &["loginctl", "lock-session"]),
+        ("system-log-out-symbolic", "Log out", log_out),
+        ("system-reboot-symbolic", "Restart", &["systemctl", "reboot"]),
+        ("system-shutdown-symbolic", "Shut down", &["systemctl", "poweroff"]),
+    ];
+    for (icon_name, title, argv) in actions {
+        let r = row(icon_name, title, None);
+        let (argv, p, hide) = (argv.iter().map(|s| s.to_string()).collect::<Vec<_>>(), pop.clone(), hide.clone());
+        on_click(&r, move || {
+            p.popdown();
+            hide();
+            nyx_providers::spawn(&argv.iter().map(String::as_str).collect::<Vec<_>>());
+        });
+        c.append(&r);
+    }
+    pop.set_child(Some(&c));
+    pop.set_parent(anchor);
+    pop.connect_closed(|p| p.unparent());
     pop.popup();
 }

@@ -211,10 +211,18 @@ pub async fn discover(on: bool) -> Result<(), String> {
 
 /// Pair with a nearby device, trust it and connect (Omarchy's sequence).
 pub async fn pair(address: &str) -> Result<(), String> {
-    crate::run(&["omarchy-bluetooth-device", "pair", address], None).await
+    if crate::omarchy::here() {
+        return crate::run(&["omarchy-bluetooth-device", "pair", address], None).await;
+    }
+    crate::run(&["bluetoothctl", "--timeout", "20", "pair", address], None).await?;
+    crate::run(&["bluetoothctl", "trust", address], None).await?;
+    crate::run(&["bluetoothctl", "--timeout", "10", "connect", address], None).await
 }
 
 /// Unpair a device: it has to be paired again to connect.
 pub async fn forget(address: &str) -> Result<(), String> {
-    crate::run(&["omarchy-bluetooth-device", "forget", address], None).await
+    if crate::omarchy::here() {
+        return crate::run(&["omarchy-bluetooth-device", "forget", address], None).await;
+    }
+    crate::run(&["bluetoothctl", "remove", address], None).await
 }
