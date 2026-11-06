@@ -570,9 +570,12 @@ pub fn build(app: &gtk::Application, only: Option<String>) -> Rc<Panel> {
     } else {
         KeyboardMode::OnDemand
     });
-    for e in [Edge::Top, Edge::Bottom, Edge::Right] {
+    // A card in the corner under the bar, as tall as what it shows.
+    for e in [Edge::Top, Edge::Right] {
         window.set_anchor(e, true);
     }
+    window.set_margin(Edge::Top, 6);
+    window.set_margin(Edge::Right, 6);
     window.set_exclusive_zone(0);
     window.set_default_size(WIDTH, -1);
 

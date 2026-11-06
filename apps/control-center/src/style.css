@@ -10,9 +10,8 @@ window.cc-catcher {
 
 window.nyx-control-center .cc-panel {
   background: @theme_popover;
-  border-left: 1px solid @theme_border;
-  border-top: 1px solid @theme_border;
-  border-radius: 15px 0 0 0;
+  border: 1px solid @theme_border;
+  border-radius: 15px;
   padding: 14px 14px 16px;
   font-family: "Inter", sans-serif;
   color: @theme_text;
