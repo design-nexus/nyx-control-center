@@ -122,6 +122,8 @@ pub struct Panel {
     detail: Cell<Option<Detail>>,
     /// A player has a song or video: Now playing is left out of the pages without one.
     has_player: Cell<bool>,
+    /// A screen's brightness can be set: Sound & brightness is one row shorter without.
+    has_brightness: Cell<bool>,
 }
 
 impl Panel {
@@ -630,6 +632,7 @@ pub fn build(app: &gtk::Application, only: Option<String>) -> Rc<Panel> {
         panel1: RefCell::default(),
         detail: Cell::new(None),
         has_player: Cell::new(false),
+        has_brightness: Cell::new(true),
     });
     *panel.me.borrow_mut() = Rc::downgrade(&panel);
 
@@ -735,6 +738,19 @@ pub fn build(app: &gtk::Application, only: Option<String>) -> Rc<Panel> {
         let has = !st.player.is_empty() && !(st.title.is_empty() && st.artist.is_empty());
         let Some(p) = w.upgrade() else { return };
         if p.has_player.replace(has) == has || p.editing.get() {
+            return;
+        }
+        let w = w.clone();
+        glib::idle_add_local_once(move || {
+            if let Some(p) = w.upgrade() {
+                p.rebuild();
+            }
+        });
+    });
+    let w = weak.clone();
+    bind(&window, nyx_providers::brightness::live(), move |st| {
+        let Some(p) = w.upgrade() else { return };
+        if !st.read || p.has_brightness.replace(st.screen.is_some()) == st.screen.is_some() || p.editing.get() {
             return;
         }
         let w = w.clone();
@@ -973,7 +989,9 @@ fn page_grid(ctx: &Ctx, page: &Page, page_index: usize, editing: bool, panel: st
         .iter()
         .map(|(_, t, k)| {
             let sizes = k.sizes();
-            if sizes.contains(&t.size) { t.size } else { sizes[0] }
+            let size = if sizes.contains(&t.size) { t.size } else { sizes[0] };
+            let no_brightness = panel.upgrade().is_some_and(|p| !p.has_brightness.get());
+            if !editing && t.widget == "sound" && no_brightness { layout::Size { rows: 1, ..size } } else { size }
         })
         .collect();
     for ((index, t, k), at) in known.iter().zip(layout::pack(&sizes)) {

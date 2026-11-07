@@ -22,6 +22,8 @@ pub struct Level {
 pub struct State {
     pub screen: Option<Level>,
     pub keyboard: Option<Level>,
+    /// False until the first reading, so "no screen backlight" isn't assumed before it.
+    pub read: bool,
 }
 
 thread_local! {
@@ -83,8 +85,9 @@ fn omarchy_script() -> bool {
 
 pub fn refresh(set: Setter<State>) {
     glib::MainContext::default().spawn_local(async move {
-        let Some(list) = output(&["brightnessctl", "-m", "-l"]).await else { return };
+        let list = output(&["brightnessctl", "-m", "-l"]).await.unwrap_or_default();
         let mut st = parse(&list);
+        st.read = true;
         if omarchy_script() {
             // The focused screen's level, as Omarchy's keys see it.
             let pct = output(&["omarchy-brightness-display"]).await.and_then(|o| o.trim().parse::<f64>().ok());
