@@ -8,7 +8,7 @@ ToggleTile {
     property var tile
     readonly property var st: ts.value || ({ peers: [] })
     readonly property int online: (st.peers || []).filter(p => p.online).length
-    BackendTopic { id: ts; client: t.ctx.client; name: "tailscale"; active: t.ctx.open && t.visible }
+    BackendTopic { id: ts; client: t.ctx.client; name: "tailscale"; active: !!(t.ctx && t.ctx.open && t.visible) }
 
     swatch: "violet"
     split: cols >= 2

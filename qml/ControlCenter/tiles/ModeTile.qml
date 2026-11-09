@@ -7,7 +7,7 @@ ToggleTile {
     property int cols: 1
     property var tile
     readonly property var st: mode.value || ({ workspace: 0, mode: "tiling", label: "Tiling" })
-    BackendTopic { id: mode; client: t.ctx.client; name: "mode"; active: t.ctx.open && t.visible }
+    BackendTopic { id: mode; client: t.ctx.client; name: "mode"; active: !!(t.ctx && t.ctx.open && t.visible) }
 
     swatch: "green"
     active: true

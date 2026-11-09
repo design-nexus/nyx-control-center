@@ -7,7 +7,7 @@ ToggleTile {
     property int cols: 2
     property var tile
     readonly property var st: net.value || ({})
-    BackendTopic { id: net; client: t.ctx.client; name: "network"; active: t.ctx.open && t.visible }
+    BackendTopic { id: net; client: t.ctx.client; name: "network"; active: !!(t.ctx && t.ctx.open && t.visible) }
 
     swatch: "blue"
     split: cols >= 2

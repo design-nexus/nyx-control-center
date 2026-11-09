@@ -12,7 +12,7 @@ ToggleTile {
     property string onStatus: "On"
     property var tips: ["", ""]
     readonly property bool isOn: !!(om.value && om.value[field])
-    BackendTopic { id: om; client: t.ctx.client; name: "omarchy"; active: t.ctx.open && t.visible }
+    BackendTopic { id: om; client: t.ctx.client; name: "omarchy"; active: !!(t.ctx && t.ctx.open && t.visible) }
 
     active: isOn
     status: isOn ? onStatus : "Off"

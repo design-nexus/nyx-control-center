@@ -9,7 +9,7 @@ TileFrame {
     property int cols: 2
     property var tile
     readonly property var st: pw.value || ({ profiles: [], profile: null })
-    BackendTopic { id: pw; client: t.ctx.client; name: "power"; active: t.ctx.open && t.visible }
+    BackendTopic { id: pw; client: t.ctx.client; name: "power"; active: !!(t.ctx && t.ctx.open && t.visible) }
 
     Rectangle {
         anchors.fill: parent

@@ -9,7 +9,7 @@ Column {
     signal back
     readonly property var st: bt.value || ({ devices: [], nearby: [] })
     property var busy: ({})
-    BackendTopic { id: bt; client: v.ctx.client; name: "bluetooth"; active: v.ctx.open }
+    BackendTopic { id: bt; client: v.ctx.client; name: "bluetooth"; active: !!(v.ctx && v.ctx.open) }
 
     // Looking for devices while this view shows.
     Component.onCompleted: if (st.powered) ctx.call("bluetooth.discover", { on: true })

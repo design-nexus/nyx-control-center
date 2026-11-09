@@ -18,7 +18,7 @@ Column {
     readonly property var own: exits.filter(p => !p.location)
     readonly property var located: exits.filter(p => !!p.location)
     readonly property var countries: Array.from(new Set(located.map(p => p.country || p.location))).sort()
-    BackendTopic { id: ts; client: v.ctx.client; name: "tailscale"; active: v.ctx.open }
+    BackendTopic { id: ts; client: v.ctx.client; name: "tailscale"; active: !!(v.ctx && v.ctx.open) }
 
     DetailHead {
         title: "Tailscale"

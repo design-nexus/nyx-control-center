@@ -9,7 +9,7 @@ TileFrame {
     property int cols: 4
     property var tile
     readonly property var st: cal.value || ({ available: false, events: [] })
-    BackendTopic { id: cal; client: t.ctx.client; name: "calendar"; active: t.ctx.open && t.visible }
+    BackendTopic { id: cal; client: t.ctx.client; name: "calendar"; active: !!(t.ctx && t.ctx.open && t.visible) }
 
     clickable: true
     tooltip: "Open Calendar"

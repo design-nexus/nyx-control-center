@@ -25,7 +25,7 @@ TileFrame {
         const here = st.scenes.filter(s => room !== "" && s.room === room);
         return (here.length ? here : st.scenes.filter(s => !s.room)).slice(0, columns === 4 ? 5 : 2);
     }
-    BackendTopic { id: home; client: t.ctx.client; name: "home"; active: t.ctx.open && t.visible }
+    BackendTopic { id: home; client: t.ctx.client; name: "home"; active: !!(t.ctx && t.ctx.open && t.visible) }
 
     function status(d) {
         if (!d.available)

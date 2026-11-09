@@ -18,8 +18,8 @@ Item {
     readonly property int gap: 8
     readonly property bool hasPlayer: !!(media.value && media.value.player)
     readonly property bool hasBrightness: !!(bright.value && bright.value.screen)
-    BackendTopic { id: media; client: d.ctx.client; name: "media"; active: d.ctx.open }
-    BackendTopic { id: bright; client: d.ctx.client; name: "brightness"; active: d.ctx.open }
+    BackendTopic { id: media; client: d.ctx.client; name: "media"; active: !!(d.ctx && d.ctx.open) }
+    BackendTopic { id: bright; client: d.ctx.client; name: "brightness"; active: !!(d.ctx && d.ctx.open) }
 
     signal changed(var pages)
     signal volumeMenu(var anchor)

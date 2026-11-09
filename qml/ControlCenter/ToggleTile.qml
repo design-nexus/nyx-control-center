@@ -27,7 +27,7 @@ TileFrame {
         x: t.compact ? (t.width - width) / 2 : 9
         icon: t.icon
         on: t.active
-        tint: t.ctx.swatch(t.swatch)
+        tint: t.ctx ? t.ctx.swatch(t.swatch) : "transparent"
     }
 
     Column {

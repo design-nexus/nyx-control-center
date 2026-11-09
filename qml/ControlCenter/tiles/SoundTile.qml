@@ -13,8 +13,8 @@ TileFrame {
     readonly property var au: audio.value || ({ outputs: [] })
     readonly property var br: bright.value || ({})
     readonly property var out: (au.outputs || []).find(o => o.default) || null
-    BackendTopic { id: audio; client: t.ctx.client; name: "audio"; active: t.ctx.open && t.visible }
-    BackendTopic { id: bright; client: t.ctx.client; name: "brightness"; active: t.ctx.open && t.visible }
+    BackendTopic { id: audio; client: t.ctx.client; name: "audio"; active: !!(t.ctx && t.ctx.open && t.visible) }
+    BackendTopic { id: bright; client: t.ctx.client; name: "brightness"; active: !!(t.ctx && t.ctx.open && t.visible) }
 
     signal volumeMenu(var anchor)
 

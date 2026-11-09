@@ -10,8 +10,8 @@ Column {
     readonly property var st: pw.value || ({ profiles: [] })
     readonly property var b: st.battery || null
     readonly property var d: det.value
-    BackendTopic { id: pw; client: v.ctx.client; name: "power"; active: v.ctx.open }
-    BackendTopic { id: det; client: v.ctx.client; name: "power-details"; active: v.ctx.open }
+    BackendTopic { id: pw; client: v.ctx.client; name: "power"; active: !!(v.ctx && v.ctx.open) }
+    BackendTopic { id: det; client: v.ctx.client; name: "power-details"; active: !!(v.ctx && v.ctx.open) }
 
     DetailHead {
         title: "Battery"

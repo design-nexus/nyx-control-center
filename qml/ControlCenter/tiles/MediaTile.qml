@@ -10,7 +10,7 @@ TileFrame {
     property var tile
     readonly property var st: media.value || ({ player: "" })
     readonly property bool nothing: !st.player
-    BackendTopic { id: media; client: t.ctx.client; name: "media"; active: t.ctx.open && t.visible }
+    BackendTopic { id: media; client: t.ctx.client; name: "media"; active: !!(t.ctx && t.ctx.open && t.visible) }
 
     function clock(us) {
         const s = Math.max(0, Math.floor(us / 1000000));

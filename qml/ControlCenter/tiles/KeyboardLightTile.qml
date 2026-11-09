@@ -11,7 +11,7 @@ ToggleTile {
     readonly property var k: st.keyboard || null
     readonly property int max: k ? k.max : 0
     readonly property int step: k ? Math.round(k.value * k.max) : 0
-    BackendTopic { id: br; client: t.ctx.client; name: "brightness"; active: t.ctx.open }
+    BackendTopic { id: br; client: t.ctx.client; name: "brightness"; active: !!(t.ctx && t.ctx.open) }
 
     visible: k !== null || !st.screen || t.ctx.editing
     swatch: "teal"

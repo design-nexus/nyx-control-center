@@ -10,7 +10,7 @@ Column {
     readonly property var st: disp.value || ({ screens: [] })
     readonly property var lap: (st.screens || []).find(s => s.internal) || null
     readonly property bool external: (st.screens || []).some(s => !s.internal && s.enabled)
-    BackendTopic { id: disp; client: v.ctx.client; name: "display"; active: v.ctx.open }
+    BackendTopic { id: disp; client: v.ctx.client; name: "display"; active: !!(v.ctx && v.ctx.open) }
 
     DetailHead {
         title: "Screens"

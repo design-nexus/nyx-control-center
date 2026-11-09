@@ -38,8 +38,8 @@ Column {
         });
     }
     property var latency: null
-    BackendTopic { id: routes; client: v.ctx.client; name: "routes"; active: v.ctx.open }
-    BackendTopic { id: net; client: v.ctx.client; name: "network"; active: v.ctx.open }
+    BackendTopic { id: routes; client: v.ctx.client; name: "routes"; active: !!(v.ctx && v.ctx.open) }
+    BackendTopic { id: net; client: v.ctx.client; name: "network"; active: !!(v.ctx && v.ctx.open) }
 
     function load() {
         if (nord.installed) {

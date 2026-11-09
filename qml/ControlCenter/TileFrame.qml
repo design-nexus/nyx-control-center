@@ -17,7 +17,7 @@ Rectangle {
     signal clicked
 
     radius: Style.radiusCard
-    color: on && swatch !== "" ? Style.mix(Style.card, ctx.swatch(swatch), tintAmount) : (clickable && hovered ? Style.mix(Style.card, Style.text, 0.04) : Style.card)
+    color: on && swatch !== "" && ctx ? Style.mix(Style.card, ctx.swatch(swatch), tintAmount) : (clickable && hovered ? Style.mix(Style.card, Style.text, 0.04) : Style.card)
     Behavior on color {
         ColorAnimation {
             duration: Style.fast

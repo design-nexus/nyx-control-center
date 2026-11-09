@@ -9,7 +9,7 @@ TileFrame {
     property int cols: 2
     property var tile
     readonly property var s: bk.value || ({})
-    BackendTopic { id: bk; client: t.ctx.client; name: "backup"; active: t.ctx.open && t.visible }
+    BackendTopic { id: bk; client: t.ctx.client; name: "backup"; active: !!(t.ctx && t.ctx.open && t.visible) }
 
     function when(ts, prefix) {
         return prefix + new Date(ts * 1000).toLocaleString(Qt.locale(), Locale.ShortFormat);

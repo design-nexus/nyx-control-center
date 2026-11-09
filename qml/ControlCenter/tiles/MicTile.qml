@@ -8,7 +8,7 @@ ToggleTile {
     property var tile
     readonly property var st: au.value || ({ inputs: [], recording: [] })
     readonly property bool live: !st.mic_muted && (st.recording || []).length > 0
-    BackendTopic { id: au; client: t.ctx.client; name: "audio"; active: t.ctx.open && t.visible }
+    BackendTopic { id: au; client: t.ctx.client; name: "audio"; active: !!(t.ctx && t.ctx.open && t.visible) }
 
     title: "Microphone"
     swatch: live ? "red" : "coral"

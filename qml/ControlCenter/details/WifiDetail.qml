@@ -12,9 +12,9 @@ Column {
     readonly property var dnsState: dns.value || ({})
     readonly property var cur: (st.networks || []).find(n => n.active) || null
     property string asking: ""
-    BackendTopic { id: net; client: v.ctx.client; name: "network"; active: v.ctx.open }
-    BackendTopic { id: details; client: v.ctx.client; name: "dns-details"; active: v.ctx.open && v.st.wifi_on === true }
-    BackendTopic { id: dns; client: v.ctx.client; name: "dns"; active: v.ctx.open }
+    BackendTopic { id: net; client: v.ctx.client; name: "network"; active: !!(v.ctx && v.ctx.open) }
+    BackendTopic { id: details; client: v.ctx.client; name: "dns-details"; active: !!(v.ctx && v.ctx.open && v.st.wifi_on === true) }
+    BackendTopic { id: dns; client: v.ctx.client; name: "dns"; active: !!(v.ctx && v.ctx.open) }
 
     function bars(sig) {
         const b = sig >= 75 ? 4 : sig >= 50 ? 3 : sig >= 25 ? 2 : 1;

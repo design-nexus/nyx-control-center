@@ -8,7 +8,7 @@ ToggleTile {
     property var tile
     readonly property var st: bt.value || ({ devices: [] })
     readonly property var connected: (st.devices || []).filter(d => d.connected)
-    BackendTopic { id: bt; client: t.ctx.client; name: "bluetooth"; active: t.ctx.open && t.visible }
+    BackendTopic { id: bt; client: t.ctx.client; name: "bluetooth"; active: !!(t.ctx && t.ctx.open && t.visible) }
 
     swatch: "teal"
     split: cols >= 2

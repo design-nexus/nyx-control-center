@@ -9,8 +9,8 @@ ToggleTile {
     readonly property var st: routes.value || ({ nord: {}, tor: {}, route: "direct" })
     readonly property var nm: ((net.value || {}).vpns || []).find(v => v.active && v.id !== "tailscale") || null
     readonly property string route: st.route || "direct"
-    BackendTopic { id: routes; client: t.ctx.client; name: "routes"; active: t.ctx.open && t.visible }
-    BackendTopic { id: net; client: t.ctx.client; name: "network"; active: t.ctx.open && t.visible }
+    BackendTopic { id: routes; client: t.ctx.client; name: "routes"; active: !!(t.ctx && t.ctx.open && t.visible) }
+    BackendTopic { id: net; client: t.ctx.client; name: "network"; active: !!(t.ctx && t.ctx.open && t.visible) }
 
     swatch: route === "both" ? "red" : "green"
     split: cols >= 2

@@ -14,7 +14,7 @@ FocusScope {
     property var draft: null
     readonly property var pages: draft || lay.pages || []
     readonly property var pw: power.value
-    BackendTopic { id: power; client: p.ctx.client; name: "power"; active: p.ctx.open }
+    BackendTopic { id: power; client: p.ctx.client; name: "power"; active: !!(p.ctx && p.ctx.open) }
 
     signal volumeMenu(var anchor)
     signal powerMenu(var anchor)

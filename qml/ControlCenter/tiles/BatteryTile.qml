@@ -8,7 +8,7 @@ TileFrame {
     property int cols: 1
     property var tile
     readonly property var b: (pw.value && pw.value.battery) || null
-    BackendTopic { id: pw; client: t.ctx.client; name: "power"; active: t.ctx.open && t.visible }
+    BackendTopic { id: pw; client: t.ctx.client; name: "power"; active: !!(t.ctx && t.ctx.open && t.visible) }
 
     clickable: true
     onClicked: ctx.openDetail("battery")
