@@ -74,4 +74,93 @@ mod tests {
         assert!(!user.contains("pages"), "NyxOS's layout isn't copied: {user}");
         assert!(!load_from::<Config>(&store).remember_page);
     }
+
+    #[test]
+    fn the_reference_layout_from_before_keeps_its_pages() {
+        #[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+        struct Full {
+            #[serde(default)]
+            pages: Vec<Page>,
+            #[serde(default)]
+            remember_page: bool,
+            #[serde(default)]
+            version: u32,
+        }
+        let d = tempfile::tempdir().unwrap();
+        let layers = nyx_config::Layers { defaults: d.path().join("d"), system: d.path().join("s"), user: d.path().join("u") };
+        std::fs::create_dir_all(&layers.user).unwrap();
+        std::fs::write(layers.user.join("control-center.toml"), KENS).unwrap();
+        let builtin = Full { pages: vec![Page { tiles: vec![Tile::new("wifi", Size::S2X1)] }, Page::default()], remember_page: true, version: 3 };
+        let store = nyx_config::Store::with_layers(layers.clone(), DOMAIN, nyx_config::table_of(&builtin));
+        let c: Full = load_from(&store);
+        assert_eq!(c.pages.len(), 1);
+        assert_eq!(c.pages[0].tiles.len(), 14);
+        assert!(c.remember_page);
+        let user = std::fs::read_to_string(layers.user.join("control-center.toml")).unwrap();
+        assert!(user.contains("pages") && !user.contains("remember_page") && !user.contains("version"), "{user}");
+        assert!(layers.user.join("control-center.toml.v0.bak").exists());
+    }
+
+    /// The reference laptop's file (Handoff 09's capture), as the panel wrote it.
+    const KENS: &str = r#"remember_page = true
+version = 3
+
+[[pages]]
+
+[[pages.tiles]]
+widget = "wifi"
+size = "2x1"
+
+[[pages.tiles]]
+widget = "bluetooth"
+size = "2x1"
+
+[[pages.tiles]]
+widget = "vpn"
+size = "2x1"
+
+[[pages.tiles]]
+widget = "tailscale"
+size = "2x1"
+
+[[pages.tiles]]
+widget = "dnd"
+size = "1x1"
+
+[[pages.tiles]]
+widget = "mode"
+size = "1x1"
+
+[[pages.tiles]]
+widget = "sound"
+size = "4x1"
+
+[[pages.tiles]]
+widget = "media"
+size = "2x1"
+
+[[pages.tiles]]
+widget = "power"
+size = "2x1"
+
+[[pages.tiles]]
+widget = "night-light"
+size = "1x1"
+
+[[pages.tiles]]
+widget = "keep-awake"
+size = "1x1"
+
+[[pages.tiles]]
+widget = "keyboard-light"
+size = "1x1"
+
+[[pages.tiles]]
+widget = "capture"
+size = "1x1"
+
+[[pages.tiles]]
+widget = "upcoming"
+size = "4x2"
+"#;
 }
