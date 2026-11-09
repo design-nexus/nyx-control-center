@@ -37,10 +37,16 @@ ShellRoot {
             const model = folders.objectAt(i);
             if (!model)
                 continue;
+            // A folder that doesn't exist makes FolderListModel list the working
+            // directory instead: take only what is inside the folder asked for.
+            const inside = "file://" + model.modelData.replace(/\/$/, "") + "/";
             for (let j = 0; j < model.count; j++) {
                 const name = model.get(j, "fileName");
+                const url = model.get(j, "fileUrl").toString();
+                if (url !== inside + name)
+                    continue;
                 if (out[name] === undefined && (shell.only.length === 0 || shell.only.indexOf(name) >= 0))
-                    out[name] = model.get(j, "fileUrl").toString();
+                    out[name] = url;
             }
         }
         if (JSON.stringify(out) !== JSON.stringify(shell.found))
@@ -67,8 +73,8 @@ ShellRoot {
         model: Object.keys(shell.found).sort()
         delegate: LazyLoader {
             required property string modelData
-            active: shell.found[modelData] !== undefined
-            source: active ? shell.found[modelData] + "/Main.qml" : ""
+            active: true
+            source: shell.found[modelData] !== undefined ? shell.found[modelData] + "/Main.qml" : ""
         }
     }
 

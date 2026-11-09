@@ -202,8 +202,17 @@ pub fn handle(app: &Rc<App>, req: Request) {
         "audio.set_input" => act(req, async move { audio::set_input(&s(&b, "name")).await }),
 
         // ---------- Brightness, screens ----------
-        "brightness.set_screen" => act(req, brightness::set_screen(f(&b, "value"))),
-        "brightness.set" => act(req, async move { brightness::set(&s(&b, "device"), f(&b, "value")).await }),
+        // Read back at once, not at the next poll, so the OSD and the sliders follow.
+        "brightness.set_screen" => act(req, async move {
+            let r = brightness::set_screen(f(&b, "value")).await;
+            brightness::refresh(brightness::live().setter());
+            r
+        }),
+        "brightness.set" => act(req, async move {
+            let r = brightness::set(&s(&b, "device"), f(&b, "value")).await;
+            brightness::refresh(brightness::live().setter());
+            r
+        }),
         "display.set_brightness" => act(req, async move { display::set_brightness(&s(&b, "screen"), f(&b, "value")).await }),
         "display.set_scale" => act(req, display::set_scale(f(&b, "value"))),
         "display.set_text_size" => act(req, display::set_text_size(f(&b, "value") as u32)),
