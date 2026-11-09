@@ -20,7 +20,6 @@ mod plugins;
 mod theme;
 mod topics;
 
-use gio::prelude::*;
 use serde_json::{Value, json};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -183,22 +182,27 @@ fn main() -> std::process::ExitCode {
     app.publish_layout();
     theme::follow(plugins::theme_changed);
 
-    // The layout file changed by hand or by Nyx Settings.
+    // The layout changed in any layer: by hand, by Nyx Settings or `nyx plugin`, or
+    // NyxOS's defaults in an update.
     let a = Rc::downgrade(&app);
-    if let Ok(fm) = gio::File::for_path(layout::path()).monitor_file(gio::FileMonitorFlags::NONE, gio::Cancellable::NONE) {
-        fm.connect_changed(move |_, _, _, event| {
-            if !matches!(event, gio::FileMonitorEvent::ChangesDoneHint | gio::FileMonitorEvent::Created) {
-                return;
-            }
+    let (tx, rx) = async_channel::unbounded::<()>();
+    if let Some(w) = nyx_widgets::settings::watch(move || {
+        let _ = tx.send_blocking(());
+    }) {
+        std::mem::forget(w);
+    }
+    glib::spawn_future_local(async move {
+        while rx.recv().await.is_ok() {
+            glib::timeout_future(std::time::Duration::from_millis(150)).await;
+            while rx.try_recv().is_ok() {}
             let Some(app) = a.upgrade() else { return };
             let fresh = layout::load();
             if *app.config.borrow() != fresh {
                 *app.config.borrow_mut() = fresh;
                 app.publish_layout();
             }
-        });
-        std::mem::forget(fm);
-    }
+        }
+    });
 
     if !test {
         let a = Rc::downgrade(&app);

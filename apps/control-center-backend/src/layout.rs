@@ -1,5 +1,6 @@
-//! The layout file (`~/.config/nyx/control-center.toml`): pages of tiles, the same file
-//! and migrations as the GTK panel, and the tile kinds the panel draws.
+//! The layout (`~/.config/nyx/control-center.toml` over NyxOS's defaults, through
+//! `nyx_widgets::settings`): pages of tiles, the same file and migrations as the GTK
+//! panel, and the tile kinds the panel draws.
 
 use nyx_widgets::layout::{Page, Size, Tile};
 use serde::{Deserialize, Serialize};
@@ -60,35 +61,21 @@ pub fn default_config() -> Config {
     Config { pages: default_pages(), remember_page: true, version: LAYOUT_VERSION, plugins: Default::default() }
 }
 
+/// The layout through every layer: the built-in one, NyxOS's, the user's changes.
 pub fn load() -> Config {
-    let path = path();
-    match std::fs::read_to_string(&path).map(|t| toml::from_str::<Config>(&t)) {
-        Ok(Ok(mut c)) if !c.pages.is_empty() => {
-            if migrate(&mut c) {
-                let _ = save(&c);
-            }
-            c
-        }
-        Ok(Err(e)) => {
-            eprintln!("nyx-control-center: {}: {e}; using the default layout", path.display());
-            default_config()
-        }
-        _ => {
-            let c = default_config();
-            let _ = save(&c);
-            c
-        }
+    let mut c: Config = nyx_widgets::settings::load(&default_config());
+    if c.pages.is_empty() {
+        c.pages = default_pages();
     }
+    if migrate(&mut c) && path().exists() {
+        let _ = save(&c);
+    }
+    c
 }
 
+/// Save what differs from the built-in layout and NyxOS's.
 pub fn save(c: &Config) -> std::io::Result<()> {
-    let path = path();
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    let tmp = path.with_extension("toml.tmp");
-    std::fs::write(&tmp, toml::to_string_pretty(c).map_err(std::io::Error::other)?)?;
-    std::fs::rename(tmp, path)
+    nyx_widgets::settings::save(&default_config(), c).map_err(std::io::Error::other)
 }
 
 /// The first-start layout (as the GTK panel's `default_pages`).

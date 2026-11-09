@@ -9,6 +9,8 @@
 //! - [`live`]: a value with subscribers that starts and stops its source.
 //! - [`layout`]: tile sizes and pages of a 4-column grid, packed first-fit, as saved in
 //!   the user's layout file.
+//! - [`settings`]: that file through NyxOS's configuration layers.
 
 pub mod layout;
 pub mod live;
+pub mod settings;

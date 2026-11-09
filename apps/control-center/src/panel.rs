@@ -76,28 +76,21 @@ pub fn config_path() -> PathBuf {
     glib::user_config_dir().join("nyx/control-center.toml")
 }
 
+fn builtin() -> Config {
+    Config { pages: tiles::default_pages(), remember_page: true, version: LAYOUT_VERSION, plugins: Default::default() }
+}
+
+/// The layout through every layer (`nyx_widgets::settings`): the built-in one, NyxOS's,
+/// the user's changes.
 pub fn load_config() -> Config {
-    let path = config_path();
-    match std::fs::read_to_string(&path).map(|t| toml::from_str::<Config>(&t)) {
-        Ok(Ok(mut c)) if !c.pages.is_empty() => {
-            if migrate(&mut c) {
-                let _ = std::fs::write(&path, toml::to_string_pretty(&c).unwrap_or_default());
-            }
-            c
-        }
-        Ok(Err(e)) => {
-            eprintln!("nyx-control-center: {}: {e}; using the default layout", path.display());
-            Config { pages: tiles::default_pages(), remember_page: true, version: LAYOUT_VERSION, plugins: Default::default() }
-        }
-        _ => {
-            let c = Config { pages: tiles::default_pages(), remember_page: true, version: LAYOUT_VERSION, plugins: Default::default() };
-            if let Some(dir) = path.parent() {
-                let _ = std::fs::create_dir_all(dir);
-            }
-            let _ = std::fs::write(&path, toml::to_string_pretty(&c).unwrap_or_default());
-            c
-        }
+    let mut c: Config = nyx_widgets::settings::load(&builtin());
+    if c.pages.is_empty() {
+        c.pages = tiles::default_pages();
     }
+    if migrate(&mut c) && config_path().exists() {
+        let _ = nyx_widgets::settings::save(&builtin(), &c);
+    }
+    c
 }
 
 pub struct Panel {
@@ -293,14 +286,8 @@ impl Panel {
             let c = self.config.borrow();
             crate::plugin_tiles::set_layout(&c.pages, &c.plugins);
         }
-        let path = config_path();
-        if let Some(dir) = path.parent() {
-            let _ = std::fs::create_dir_all(dir);
-        }
-        let tmp = path.with_extension("toml.tmp");
-        let text = toml::to_string_pretty(&*self.config.borrow()).unwrap_or_default();
-        if std::fs::write(&tmp, text).and_then(|_| std::fs::rename(&tmp, &path)).is_err() {
-            eprintln!("nyx-control-center: couldn't save the layout to {}", path.display());
+        if let Err(e) = nyx_widgets::settings::save(&builtin(), &*self.config.borrow()) {
+            eprintln!("nyx-control-center: couldn't save the layout: {e}");
         }
     }
 
@@ -481,10 +468,10 @@ impl Panel {
         }
     }
 
-    /// The layout file changed on disk (`nyx plugin` placed a tile): show it.
+    /// The layout changed in a layer (`nyx plugin` placed a tile, NyxOS's defaults
+    /// changed): show it.
     fn reload_config(&self) {
-        let path = config_path();
-        let Ok(Ok(c)) = std::fs::read_to_string(&path).map(|t| toml::from_str::<Config>(&t)) else { return };
+        let c = load_config();
         if c.pages.is_empty() || *self.config.borrow() == c {
             return;
         }
@@ -718,17 +705,21 @@ pub fn build(app: &gtk::Application, only: Option<String>) -> Rc<Panel> {
         crate::plugin_tiles::set_layout(&c.pages, &c.plugins);
     }
     let w = weak.clone();
-    if let Ok(m) = gio::File::for_path(config_path()).monitor_file(gio::FileMonitorFlags::WATCH_MOVES, gio::Cancellable::NONE) {
-        m.connect_changed(move |_, _, _, ev| {
-            if matches!(ev, gio::FileMonitorEvent::ChangesDoneHint | gio::FileMonitorEvent::Created | gio::FileMonitorEvent::MovedIn | gio::FileMonitorEvent::Renamed)
-                && let Some(p) = w.upgrade()
-            {
-                p.reload_config();
-            }
-        });
+    let (tx, rx) = async_channel::unbounded::<()>();
+    if let Some(watch) = nyx_widgets::settings::watch(move || {
+        let _ = tx.send_blocking(());
+    }) {
         // Lives as long as the panel, which lives as long as the app.
-        std::mem::forget(m);
+        std::mem::forget(watch);
     }
+    glib::spawn_future_local(async move {
+        while rx.recv().await.is_ok() {
+            glib::timeout_future(std::time::Duration::from_millis(150)).await;
+            while rx.try_recv().is_ok() {}
+            let Some(p) = w.upgrade() else { return };
+            p.reload_config();
+        }
+    });
     panel.rebuild();
     panel.go_to(0);
     // A hidden tile would leave its rows empty in the grid, so the pages are drawn

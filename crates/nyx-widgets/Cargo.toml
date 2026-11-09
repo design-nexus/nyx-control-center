@@ -8,5 +8,9 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
+nyx-config = { git = "https://github.com/nyxos-project/nyx-system.git", rev = "2c051e628af5582516ece1a8790882328194c26b", features = ["watch"] }
 serde = { version = "1", features = ["derive"] }
 toml = "1"
+
+[dev-dependencies]
+tempfile = "3"
