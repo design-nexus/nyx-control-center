@@ -12,7 +12,7 @@ const BUS: &str = "io.github.design_nexus.nyx.Home.Automation";
 const PATH: &str = "/io/github/design_nexus/nyx/Home/Devices";
 const IFACE: &str = "io.github.design_nexus.nyx.Home.Devices1";
 
-#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, serde::Serialize)]
 pub struct Device {
     pub id: String,
     pub name: String,
@@ -35,14 +35,14 @@ fn yes() -> bool {
     true
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, serde::Serialize)]
 pub struct Scene {
     pub id: String,
     pub name: String,
     pub room: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Deserialize, serde::Serialize)]
 pub struct State {
     /// Home's service answered (it's installed and connected to Home Assistant).
     #[serde(skip)]

@@ -6,7 +6,7 @@ use crate::{Debounce, SignalStop, Stops, system_bus};
 use gio::prelude::*;
 use nyx_widgets::live::{Live, Setter, Stop};
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct Device {
     pub path: String,
     pub name: String,
@@ -20,7 +20,7 @@ pub struct Device {
     pub rssi: Option<i16>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct State {
     /// There's an adapter.
     pub available: bool,

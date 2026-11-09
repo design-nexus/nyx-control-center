@@ -9,7 +9,7 @@ use crate::{TimerStop, output, run};
 use nyx_widgets::live::{Live, Setter, Stop};
 use std::time::Duration;
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct Level {
     pub device: String,
     /// 0.0–1.0
@@ -18,7 +18,7 @@ pub struct Level {
     pub max: u32,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct State {
     pub screen: Option<Level>,
     pub keyboard: Option<Level>,

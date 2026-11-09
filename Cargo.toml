@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["apps/control-center", "crates/nyx-widgets", "crates/nyx-providers"]
+members = ["apps/control-center", "apps/control-center-backend", "crates/nyx-widgets", "crates/nyx-providers"]
 
 [workspace.package]
 edition = "2024"

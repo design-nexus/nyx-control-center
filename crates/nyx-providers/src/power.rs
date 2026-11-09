@@ -4,7 +4,7 @@ use crate::{SignalStop, Stops, system_bus};
 use gio::prelude::*;
 use nyx_widgets::live::{Live, Setter, Stop};
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize)]
 pub enum Profile {
     PowerSaver,
     #[default]
@@ -39,7 +39,7 @@ impl Profile {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct Battery {
     /// 0–100
     pub percent: f64,
@@ -49,7 +49,7 @@ pub struct Battery {
     pub time: Option<i64>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct State {
     pub profiles: Vec<Profile>,
     pub profile: Option<Profile>,
@@ -188,7 +188,7 @@ mod tests {
 
 /// What Omarchy's power panel shows beyond the percentage (`omarchy-battery-status
 /// --shell`): power draw, capacity, charge cycles and the charge limit.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct Details {
     pub state: String,
     /// "13.1W".

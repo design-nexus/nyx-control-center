@@ -18,6 +18,7 @@ nyx-plugin-host = { git = "https://github.com/design-nexus/nyx-core.git", rev = 
 nyx-plugin-protocol = { git = "https://github.com/design-nexus/nyx-core.git", rev = "4378e243aeb09733843996663cd9a5a7f0cbb821" }
 nyx-plugin-view = { git = "https://github.com/design-nexus/nyx-design.git", rev = "40db521bab468d54f18f65c6aabd7fc8533d6a4d" }
 nyx-providers = { path = "../../crates/nyx-providers" }
+nyx-ui-link = { git = "https://github.com/design-nexus/nyx-core.git", rev = "afae3bb8dceba28026a83f24a14e51b47c726dfe" }
 nyx-theme = { git = "https://github.com/design-nexus/nyx-design.git", rev = "40db521bab468d54f18f65c6aabd7fc8533d6a4d" }
 nyx-widgets = { path = "../../crates/nyx-widgets" }
 serde = { version = "1", features = ["derive"] }

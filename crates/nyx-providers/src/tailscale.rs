@@ -8,7 +8,7 @@ use nyx_widgets::live::{Live, Setter, Stop};
 use serde_json::Value;
 use std::time::Duration;
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct Machine {
     pub name: String,
     /// `name.tailnet.ts.net` (without the trailing dot).
@@ -25,7 +25,7 @@ pub struct Machine {
     pub country: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct Account {
     pub id: String,
     pub tailnet: String,
@@ -33,7 +33,7 @@ pub struct Account {
     pub active: bool,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct State {
     pub installed: bool,
     /// `Running`, `Stopped`, `NeedsLogin`, `Starting`…

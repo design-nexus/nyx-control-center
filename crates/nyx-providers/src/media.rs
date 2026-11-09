@@ -8,7 +8,7 @@ use nyx_widgets::live::{Live, Setter, Stop};
 const PATH: &str = "/org/mpris/MediaPlayer2";
 const PLAYER: &str = "org.mpris.MediaPlayer2.Player";
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct State {
     /// The player's bus name; empty when nothing is playing anywhere.
     pub player: String,

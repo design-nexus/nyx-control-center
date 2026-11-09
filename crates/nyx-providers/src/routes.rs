@@ -12,7 +12,7 @@ use std::time::Duration;
 
 /// The default VPN (see [`crate::vpn::default_service`]). Named `Nord` as it was
 /// NordVPN's first; it describes whichever service is the default.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct Nord {
     pub installed: bool,
     /// "NordVPN", "Mullvad", a connection's name…
@@ -34,7 +34,7 @@ impl Nord {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub enum TorMode {
     /// Every packet; the local network is dropped too.
     Strict,
@@ -71,7 +71,7 @@ impl TorMode {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct Tor {
     pub installed: bool,
     pub running: bool,
@@ -92,13 +92,13 @@ impl Tor {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct State {
     pub nord: Nord,
     pub tor: Tor,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub enum Route {
     Direct,
     Nord,

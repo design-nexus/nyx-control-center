@@ -6,7 +6,7 @@ use std::time::Duration;
 const BUS: &str = "io.github.design_nexus.nyx.Backup1";
 const PATH: &str = "/io/github/design_nexus/nyx/Backup1";
 const IFACE: &str = "io.github.design_nexus.nyx.Control";
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct State {
     pub grant: Option<String>,
     pub name: String,

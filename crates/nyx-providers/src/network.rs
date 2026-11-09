@@ -5,7 +5,7 @@ use crate::{Debounce, Watch, output, run, terse_fields};
 use nyx_widgets::live::{Live, Setter, Stop};
 use std::cell::RefCell;
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct Network {
     pub ssid: String,
     pub signal: u8,
@@ -15,7 +15,7 @@ pub struct Network {
     pub active: bool,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct Vpn {
     pub name: String,
     /// NetworkManager's connection uuid, or `tailscale`.
@@ -23,7 +23,7 @@ pub struct Vpn {
     pub active: bool,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct State {
     /// Whether NetworkManager answered at all.
     pub available: bool,

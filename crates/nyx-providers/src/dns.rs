@@ -15,7 +15,7 @@ pub const PROVIDERS: &[(&str, &str, &str)] = &[
     ("Custom", "Custom", "Your own servers, typed in a terminal"),
 ];
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct Band {
     /// The band the radio is on now: `2.4`, `5`, `6`.
     pub current: String,
@@ -24,7 +24,7 @@ pub struct Band {
     pub selected: String,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct State {
     /// `DHCP`, `Cloudflare`, `Google`, `Custom`; empty if Omarchy's command is missing.
     pub dns: String,
@@ -118,7 +118,7 @@ mod tests {
 // ---------------------------------------------------------------- Connection details
 
 /// The active connection, as Omarchy's network panel shows it.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct Details {
     pub iface: String,
     /// `wifi`, `ethernet`.

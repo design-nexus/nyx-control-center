@@ -7,7 +7,7 @@ use crate::{Debounce, Watch, output, run};
 use nyx_widgets::live::{Live, Setter, Stop};
 use serde_json::Value;
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct Output {
     pub name: String,
     pub description: String,
@@ -16,7 +16,7 @@ pub struct Output {
     pub default: bool,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct Stream {
     pub index: u32,
     pub app: String,
@@ -27,7 +27,7 @@ pub struct Stream {
     pub muted: bool,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct State {
     pub available: bool,
     /// 0.0–1.5 (150 % is allowed, as in Omarchy).

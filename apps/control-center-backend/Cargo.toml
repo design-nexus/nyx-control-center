@@ -1,0 +1,28 @@
+[package]
+name = "nyx-control-center-backend"
+version = "0.1.0"
+description = "Nyx Control Center without GTK: providers, layout, plugin tiles and Panel1, for its Quickshell interface"
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "nyx-control-center-backend"
+path = "src/main.rs"
+
+[dependencies]
+async-channel = "2"
+gio = "0.22"
+glib = "0.22"
+nyx-desktop = { git = "https://github.com/design-nexus/nyx-core.git", rev = "4378e243aeb09733843996663cd9a5a7f0cbb821" }
+nyx-plugin = { git = "https://github.com/design-nexus/nyx-core.git", rev = "4378e243aeb09733843996663cd9a5a7f0cbb821" }
+nyx-plugin-host = { git = "https://github.com/design-nexus/nyx-core.git", rev = "4378e243aeb09733843996663cd9a5a7f0cbb821" }
+nyx-plugin-protocol = { git = "https://github.com/design-nexus/nyx-core.git", rev = "4378e243aeb09733843996663cd9a5a7f0cbb821" }
+nyx-providers = { path = "../../crates/nyx-providers" }
+nyx-theme-core = { git = "https://github.com/design-nexus/nyx-design.git", rev = "40db521bab468d54f18f65c6aabd7fc8533d6a4d" }
+nyx-ui-link = { git = "https://github.com/design-nexus/nyx-core.git", rev = "afae3bb8dceba28026a83f24a14e51b47c726dfe" }
+nyx-widgets = { path = "../../crates/nyx-widgets" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "1"

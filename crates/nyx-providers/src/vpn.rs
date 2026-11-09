@@ -12,7 +12,7 @@ use crate::{TimerStop, output, present, run};
 use nyx_widgets::live::{Live, Setter, Stop};
 use std::time::Duration;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub enum Kind {
     Nord,
     Express,
@@ -26,7 +26,7 @@ pub enum Kind {
     },
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Service {
     /// Stable: `nord`, `express`, `pia`, `mullvad`, `proton`, `nm:<uuid>`.
     pub id: String,
@@ -45,7 +45,7 @@ impl Service {
 }
 
 /// A place a service can connect to: what to pass it, and what to show.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Place {
     pub arg: String,
     pub name: String,
@@ -53,7 +53,7 @@ pub struct Place {
     pub city: bool,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct State {
     pub services: Vec<Service>,
 }

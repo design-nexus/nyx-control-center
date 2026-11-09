@@ -16,7 +16,7 @@ use gio::prelude::*;
 use nyx_widgets::live::{Live, Setter, Stop};
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct State {
     pub dnd: bool,
     pub keep_awake: bool,

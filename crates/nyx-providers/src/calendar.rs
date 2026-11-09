@@ -9,7 +9,7 @@ use nyx_widgets::live::{Live, Setter, Stop};
 use std::path::PathBuf;
 use std::time::Duration;
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct Event {
     pub title: String,
     pub calendar: String,
@@ -22,7 +22,7 @@ pub struct Event {
     pub all_day: bool,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct State {
     /// Nyx Calendar's agenda exists (Calendar is installed and has run).
     pub available: bool,

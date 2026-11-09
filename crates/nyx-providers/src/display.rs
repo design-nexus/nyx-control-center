@@ -14,7 +14,7 @@ pub const TEXT_MIN: u32 = 9;
 pub const TEXT_MAX: u32 = 20;
 pub const TEXT_DEFAULT: u32 = 12;
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct Screen {
     pub name: String,
     pub focused: bool,
@@ -27,7 +27,7 @@ pub struct Screen {
     pub internal: bool,
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
 pub struct State {
     pub screens: Vec<Screen>,
     /// The focused screen's scale.
