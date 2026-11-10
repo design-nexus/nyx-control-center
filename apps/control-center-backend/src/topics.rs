@@ -181,9 +181,27 @@ fn start(app: &Rc<App>, topic: &str) -> Option<Box<dyn Any>> {
             Box::new((sub, Timer(Some(tick))))
         }
         "mode" => {
-            let link = app.link.clone();
-            let w = nyx_desktop::watch::watch_local(move |u| link.publish("mode", mode_json(&u.desktop)));
-            Box::new(w)
+            use gio::prelude::*;
+            let last: Rc<RefCell<Option<std::sync::Arc<nyx_desktop::Desktop>>>> = Rc::default();
+            let (link, seen) = (app.link.clone(), last.clone());
+            let w = nyx_desktop::watch::watch_local(move |u| {
+                *seen.borrow_mut() = Some(u.desktop.clone());
+                link.publish("mode", mode_json(&u.desktop));
+            });
+            // Omarchy saves a workspace's mode after Hyprland has heard of the change, so
+            // its events can come before the file: the file changing says it again.
+            let dir = nyx_desktop::omarchy::layouts_dir();
+            let _ = std::fs::create_dir_all(&dir);
+            let monitor = gio::File::for_path(&dir).monitor_directory(gio::FileMonitorFlags::NONE, gio::Cancellable::NONE).ok();
+            if let Some(m) = &monitor {
+                let link = app.link.clone();
+                m.connect_changed(move |_, _, _, _| {
+                    if let Some(desktop) = last.borrow().as_ref() {
+                        link.publish("mode", mode_json(desktop));
+                    }
+                });
+            }
+            Box::new((w, monitor))
         }
         _ => return None,
     })
