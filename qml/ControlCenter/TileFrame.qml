@@ -27,9 +27,12 @@ Rectangle {
     HoverHandler {
         id: hover
     }
-    TapHandler {
+    // A MouseArea, not a TapHandler: the first click on the panel also gives it the
+    // keyboard, and the window turning active cancels a TapHandler's tap.
+    MouseArea {
+        anchors.fill: parent
         enabled: f.clickable
-        onTapped: f.clicked()
+        onClicked: f.clicked()
     }
     Tip {
         target: f
