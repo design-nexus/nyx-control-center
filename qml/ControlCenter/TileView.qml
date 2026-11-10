@@ -15,6 +15,9 @@ Loader {
     readonly property bool isPlugin: widget.indexOf("plugin:") === 0
     readonly property bool known: isPlugin || comps[widget] !== undefined
 
+    // The height the tile's content needs (0: the grid's rows are enough).
+    readonly property real need: item && item.need !== undefined ? item.need : 0
+
     signal volumeMenu(var anchor)
 
     readonly property var comps: ({

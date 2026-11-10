@@ -9,6 +9,8 @@ TileFrame {
     property int cols: 2
     property var tile
     readonly property var st: pw.value || ({ profiles: [], profile: null })
+    // Its buttons are as tall as a row, inside 5 px: as in GTK, this sets the row height.
+    readonly property real need: 58
     BackendTopic { id: pw; client: t.ctx.client; name: "power"; active: !!(t.ctx && t.ctx.open && t.visible) }
 
     Rectangle {

@@ -2,8 +2,8 @@ import QtQuick
 import Nyx.Shell
 import Nyx.Ui
 
-// Pages of tiles in a 4-column grid of 48 px rows, packed first-fit as nyx-widgets'
-// `pack` does. Swipe or scroll sideways, or the dots, change page. In edit mode each
+// Pages of tiles in a 4-column grid, packed first-fit as nyx-widgets' `pack` does. Rows
+// are 48 px, or as tall as the page's tallest content needs (GTK's homogeneous rows). Swipe or scroll sideways, or the dots, change page. In edit mode each
 // tile can be removed, resized and dragged to another place or onto a page's dot.
 Item {
     id: d
@@ -14,7 +14,15 @@ Item {
     property int page: 0
     property bool editing: false
     readonly property real cellW: (width - 3 * gap) / 4
-    readonly property int rowH: 48
+    // The tiles on screen, for the rows' height.
+    property var views: []
+    function register(v) {
+        views = views.concat([v]);
+    }
+    function unregister(v) {
+        views = views.filter(x => x !== v);
+    }
+    readonly property int rowH: views.reduce((h, v) => v.page === page && v.need > 0 ? Math.max(h, Math.ceil((v.need - (v.rows - 1) * gap) / v.rows)) : h, 48)
     readonly property int gap: 8
     readonly property bool hasPlayer: !!(media.value && media.value.player)
     readonly property bool hasBrightness: !!(bright.value && bright.value.screen)
@@ -158,7 +166,10 @@ Item {
                         Drag.hotSpot.y: height / 2
 
                         TileView {
+                            id: view
                             anchors.fill: parent
+                            Component.onCompleted: d.register(view)
+                            Component.onDestruction: d.unregister(view)
                             ctx: d.ctx
                             tile: cell.modelData.tile
                             cols: cell.modelData.cols

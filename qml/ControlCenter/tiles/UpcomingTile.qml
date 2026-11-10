@@ -11,6 +11,7 @@ TileFrame {
     readonly property var st: cal.value || ({ available: false, events: [] })
     BackendTopic { id: cal; client: t.ctx.client; name: "calendar"; active: !!(t.ctx && t.ctx.open && t.visible) }
 
+    readonly property real need: (t.st.events || []).length ? events.y + events.implicitHeight + 10 : 0
     clickable: true
     tooltip: "Open Calendar"
     onClicked: ctx.call("open_app", { id: "io.github.design_nexus.nyx.Calendar" })
@@ -41,12 +42,13 @@ TileFrame {
         dim: true
     }
     Column {
+        id: events
         anchors.top: head.bottom
         anchors.topMargin: 8
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.margins: 10
-        spacing: 4
+        spacing: 6
         Repeater {
             model: (t.st.events || []).slice(0, t.cols >= 4 ? 4 : 3)
             delegate: Rectangle {
@@ -54,7 +56,7 @@ TileFrame {
                 required property var modelData
                 readonly property color c: /^#[0-9a-fA-F]{6}/.test(modelData.color || "") ? modelData.color.substr(0, 7) : "#8a8f98"
                 width: parent.width
-                height: 30
+                height: 26
                 radius: Style.radiusSmall
                 color: Style.mix(Style.card, ev.c, 0.13)
                 border.width: 1
@@ -66,6 +68,7 @@ TileFrame {
                     anchors.rightMargin: 8
                     anchors.verticalCenter: parent.verticalCenter
                     text: ev.modelData.title
+                    size: 12.5
                     color: Style.mix(Style.text, ev.c, 0.22)
                     font.weight: Font.Medium
                 }
