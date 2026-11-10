@@ -100,7 +100,7 @@ Column {
     }
     Foot {
         IconButton {
-            icon: "emblem-system-symbolic"
+            icon: "nyx-settings-symbolic"
             tooltip: "Display settings: resolution, arrangement, refresh rate"
             onClicked: {
                 v.ctx.hide();

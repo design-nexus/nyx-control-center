@@ -103,7 +103,7 @@ Column {
     }
     Foot {
         IconButton {
-            icon: "emblem-system-symbolic"
+            icon: "nyx-settings-symbolic"
             tooltip: "Bluetooth settings"
             onClicked: {
                 v.ctx.hide();

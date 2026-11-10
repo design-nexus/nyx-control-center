@@ -17,7 +17,7 @@ FocusScope {
     // The most the panel may be (the screen's room); a detail view taller than what's
     // left below the header scrolls, as GTK's did.
     property real maxHeight: 100000
-    readonly property real roomForContent: maxHeight - 52
+    readonly property real roomForContent: maxHeight - 52 - footHost.height
     property var draft: null
     readonly property var pages: draft || lay.pages || []
     readonly property var pw: power.value
@@ -116,7 +116,7 @@ FocusScope {
                 }
                 IconButton {
                     visible: !p.ctx.editing
-                    icon: "emblem-system-symbolic"
+                    icon: "nyx-settings-symbolic"
                     tooltip: "Settings"
                     onClicked: {
                         p.ctx.hide();
@@ -245,12 +245,24 @@ FocusScope {
                         if (item.tileId !== undefined)
                             item.tileId = shownDetail;
                         item.back.connect(p.back);
+                        // Its footer goes below the scrolling view.
+                        for (const c of item.children)
+                            if (c.detailFoot)
+                                c.parent = footHost;
                         // Screenshot hook: NYX_CC_TEST_SCROLL scrolls a detail view to its end.
                         if (Quickshell.env("NYX_CC_TEST_SCROLL"))
                             scrollTest.restart();
                     }
                 }
             }
+        }
+
+        // ---------- A detail view's footer, outside its scrolling ----------
+        Item {
+            id: footHost
+            width: parent.width
+            visible: p.detail !== ""
+            height: visible ? childrenRect.height : 0
         }
 
         // ---------- Dots ----------

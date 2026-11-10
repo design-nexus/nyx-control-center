@@ -112,7 +112,7 @@ PopupWindow {
                 width: parent.width
                 layoutDirection: Qt.RightToLeft
                 IconButton {
-                    icon: "emblem-system-symbolic"
+                    icon: "nyx-settings-symbolic"
                     tooltip: "Sound settings"
                     onClicked: {
                         pop.visible = false;

@@ -245,7 +245,7 @@ Column {
     }
     Foot {
         IconButton {
-            icon: "emblem-system-symbolic"
+            icon: "nyx-settings-symbolic"
             tooltip: "Wi-Fi settings"
             onClicked: {
                 v.ctx.hide();

@@ -88,7 +88,7 @@ Column {
     }
     Foot {
         IconButton {
-            icon: "emblem-system-symbolic"
+            icon: "nyx-settings-symbolic"
             tooltip: "Power settings: suspend, lid, power button"
             onClicked: {
                 v.ctx.hide();

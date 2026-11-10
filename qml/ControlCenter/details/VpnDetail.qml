@@ -246,7 +246,7 @@ Column {
                 model: [["Kill Switch", "killswitch", "Block the internet whenever the VPN drops"], ["Auto-connect", "autoconnect", "Connect when the computer starts"], ["Threat Protection Lite", "threatprotectionlite", "Block ads and malicious sites"]]
                 delegate: CcRow {
                     required property var modelData
-                    icon: "emblem-system-symbolic"
+                    icon: "nyx-settings-symbolic"
                     title: modelData[0]
                     sub: modelData[2]
                     clickable: false
