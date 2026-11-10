@@ -4,7 +4,7 @@
 use crate::ui::{self, act, bind, chip, icon, icon_button, label, set_class};
 use gtk::prelude::*;
 use gtk::{gio, glib};
-use nyx_providers::{audio, bluetooth, brightness, media, network, omarchy, power};
+use nyx_providers::{audio, bluetooth, brightness, devices, media, network, omarchy, power};
 use nyx_widgets::layout::{Page, Size, Tile};
 use nyx_widgets::live::Live;
 use std::rc::Rc;
@@ -29,6 +29,8 @@ pub struct Ctx {
 pub enum Detail {
     Wifi,
     Bluetooth,
+    /// Phones paired through Flux.
+    Devices,
     Vpn,
     Tailscale,
     Display,
@@ -45,6 +47,7 @@ impl Detail {
         match s {
             "wifi" => Some(Detail::Wifi),
             "bluetooth" => Some(Detail::Bluetooth),
+            "devices" => Some(Detail::Devices),
             "vpn" => Some(Detail::Vpn),
             "tailscale" => Some(Detail::Tailscale),
             "display" => Some(Detail::Display),
@@ -86,6 +89,7 @@ pub fn kinds() -> Vec<Kind> {
             sizes: &[S::S2X1, S::S1X1],
             build: bluetooth_tile,
         },
+        Kind { id: "devices", name: "Devices", icon: "phone-symbolic", sizes: &[S::S2X1, S::S1X1], build: devices_tile },
         Kind {
             id: "tailscale",
             name: "Tailscale",
@@ -401,6 +405,61 @@ fn bluetooth_tile(ctx: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
             connected[0].name.clone()
         } else {
             format!("{} devices", connected.len())
+        });
+    });
+    tile.upcast()
+}
+
+fn devices_tile(ctx: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
+    let open = {
+        let o = ctx.open.clone();
+        move || {
+            let st = devices::live().get();
+            if st.installed && !st.available {
+                act(devices::start_flux());
+            } else {
+                o(Detail::Devices)
+            }
+        }
+    };
+    let (tile, chip_box, _, status) = if size.cols >= 2 {
+        let o = ctx.open.clone();
+        split("phone-symbolic", "Devices", open, move || o(Detail::Devices))
+    } else {
+        toggle(size, "phone-symbolic", "Devices", open)
+    };
+    tint(&tile, "green");
+    let t = tile.clone();
+    bind(&tile, devices::live(), move |st| {
+        let connected = st.connected();
+        t.set_tooltip_text(Some(&if !st.installed {
+            "Flux isn't installed".to_string()
+        } else if !st.available {
+            "Flux isn't running. Click to start it".to_string()
+        } else if connected.is_empty() {
+            "No device is connected. Click for your devices".to_string()
+        } else {
+            format!(
+                "Connected: {}. Click for your devices",
+                connected.iter().map(|d| d.name.as_str()).collect::<Vec<_>>().join(", ")
+            )
+        }));
+        on(&t, !connected.is_empty());
+        on(&chip_box, !connected.is_empty());
+        t.set_sensitive(st.installed);
+        let battery = |d: &devices::Device| d.battery.map(|b| format!(" · {b}%")).unwrap_or_default();
+        status.set_text(&if !st.installed {
+            "Not installed".into()
+        } else if !st.available {
+            "Flux isn't running".into()
+        } else if let Some(name) = st.pairing.first() {
+            format!("{name} wants to pair")
+        } else if connected.is_empty() {
+            if st.devices.is_empty() { "None paired".into() } else { "None connected".into() }
+        } else if connected.len() == 1 {
+            format!("{}{}", connected[0].name, battery(connected[0]))
+        } else {
+            format!("{} connected", connected.len())
         });
     });
     tile.upcast()

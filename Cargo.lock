@@ -1008,6 +1008,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "nyx-connect"
+version = "0.1.0"
+source = "git+https://github.com/design-nexus/nyx-core.git?rev=43d7c2e7684be8274c764619c5ac3886ed6b9438#43d7c2e7684be8274c764619c5ac3886ed6b9438"
+dependencies = [
+ "nyx-devices",
+ "serde",
+ "serde_json",
+ "toml",
+]
+
+[[package]]
 name = "nyx-control-center"
 version = "0.1.0"
 dependencies = [
@@ -1076,6 +1087,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "nyx-devices"
+version = "0.1.0"
+source = "git+https://github.com/design-nexus/nyx-core.git?rev=43d7c2e7684be8274c764619c5ac3886ed6b9438#43d7c2e7684be8274c764619c5ac3886ed6b9438"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "nyx-plugin"
 version = "0.1.0"
 source = "git+https://github.com/design-nexus/nyx-core.git?rev=4378e243aeb09733843996663cd9a5a7f0cbb821#4378e243aeb09733843996663cd9a5a7f0cbb821"
@@ -1126,8 +1146,10 @@ dependencies = [
 name = "nyx-providers"
 version = "0.1.0"
 dependencies = [
+ "async-channel",
  "gio",
  "glib",
+ "nyx-connect",
  "nyx-widgets",
  "rusqlite",
  "serde",

@@ -257,7 +257,7 @@ FocusScope {
                                 return "";
                             if (w.indexOf("plugin:") === 0)
                                 return "details/PluginDetail.qml";
-                            return "details/" + ({ wifi: "Wifi", bluetooth: "Bluetooth", vpn: "Vpn", tailscale: "Tailscale", display: "Display", battery: "Battery" })[w] + "Detail.qml";
+                            return "details/" + ({ wifi: "Wifi", bluetooth: "Bluetooth", devices: "Devices", vpn: "Vpn", tailscale: "Tailscale", display: "Display", battery: "Battery" })[w] + "Detail.qml";
                         }
                         onLoaded: {
                             item.ctx = Qt.binding(() => p.ctx);

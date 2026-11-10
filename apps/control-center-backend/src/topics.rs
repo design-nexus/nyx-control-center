@@ -4,7 +4,8 @@
 
 use crate::App;
 use nyx_providers::{
-    audio, backup, bluetooth, brightness, calendar, display, dns, home, media, network, omarchy, power, routes, tailscale, vpn,
+    audio, backup, bluetooth, brightness, calendar, devices, display, dns, home, media, network, omarchy, power, routes,
+    tailscale, vpn,
 };
 use nyx_widgets::live::{Live, Subscription};
 use serde::Serialize;
@@ -134,6 +135,7 @@ fn start(app: &Rc<App>, topic: &str) -> Option<Box<dyn Any>> {
         "audio" => bind(app, "audio", audio::live(), plain),
         "network" => bind(app, "network", network::live(), network_json),
         "bluetooth" => bind(app, "bluetooth", bluetooth::live(), plain),
+        "devices" => bind(app, "devices", devices::live(), plain),
         "brightness" => bind(app, "brightness", brightness::live(), plain),
         "display" => bind(app, "display", display::live(), plain),
         "dns" => bind(app, "dns", dns::live(), plain),

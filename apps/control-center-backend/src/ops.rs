@@ -4,7 +4,7 @@
 
 use crate::{App, launch, layout, plugins};
 use nyx_providers::{
-    audio, backup, bluetooth, brightness, display, dns, home, media, network, omarchy, power, routes, tailscale, vpn,
+    audio, backup, bluetooth, brightness, devices, display, dns, home, media, network, omarchy, power, routes, tailscale, vpn,
 };
 use nyx_ui_link::Request;
 use serde_json::{Value, json};
@@ -259,6 +259,9 @@ pub fn handle(app: &Rc<App>, req: Request) {
         "bluetooth.discover" => act(req, bluetooth::discover(on(&b))),
         "bluetooth.pair" => act(req, async move { bluetooth::pair(&s(&b, "address")).await }),
         "bluetooth.forget" => act(req, async move { bluetooth::forget(&s(&b, "address")).await }),
+        "devices.ring" => act(req, async move { devices::ring(&s(&b, "id")).await }),
+        "devices.send_clipboard" => act(req, async move { devices::send_clipboard(&s(&b, "id")).await }),
+        "devices.start" => act(req, devices::start_flux()),
 
         // ---------- Toggles, power, media, home ----------
         "omarchy.toggle_dnd" => act(req, omarchy::toggle_dnd()),

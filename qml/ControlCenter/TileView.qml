@@ -23,7 +23,8 @@ Loader {
     readonly property var comps: ({
             wifi: wifi, bluetooth: bluetooth, tailscale: tailscale, vpn: vpn, dnd: dnd, "night-light": nightLight,
             "keep-awake": keepAwake, microphone: mic, mode: mode, capture: capture, "keyboard-light": kbd,
-            battery: battery, power: power, sound: sound, media: media, upcoming: upcoming, home: home, backup: backup
+            battery: battery, power: power, sound: sound, media: media, upcoming: upcoming, home: home, backup: backup,
+            devices: devices
         })
     sourceComponent: isPlugin ? ((ctx.client.state.plugins && (ctx.client.state.plugins.kinds || []).some(k => k.id === widget)) ? plugin : missing) : (comps[widget] || null)
     onLoaded: if (item.volumeMenu)
@@ -31,6 +32,7 @@ Loader {
 
     Component { id: wifi; WifiTile { ctx: v.ctx; cols: v.cols; tile: v.tile } }
     Component { id: bluetooth; BluetoothTile { ctx: v.ctx; cols: v.cols; tile: v.tile } }
+    Component { id: devices; DevicesTile { ctx: v.ctx; cols: v.cols; tile: v.tile } }
     Component { id: tailscale; TailscaleTile { ctx: v.ctx; cols: v.cols; tile: v.tile } }
     Component { id: vpn; VpnTile { ctx: v.ctx; cols: v.cols; tile: v.tile } }
     Component {

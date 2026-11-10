@@ -4,7 +4,7 @@ use crate::tiles::{Detail, app_icon, output_icon};
 use crate::ui::{self, act, bind, icon, icon_button, label, set_class};
 use gtk::glib;
 use gtk::prelude::*;
-use nyx_providers::{audio, bluetooth, network};
+use nyx_providers::{audio, bluetooth, devices, network};
 use std::rc::Rc;
 
 /// Build a detail view. `back` returns to the dashboard.
@@ -12,6 +12,7 @@ pub fn view(which: Detail, back: Rc<dyn Fn()>) -> gtk::Widget {
     match which {
         Detail::Wifi => wifi(back),
         Detail::Bluetooth => bluetooth_view(back),
+        Detail::Devices => devices_view(back),
         Detail::Vpn => crate::route_tiles::vpn_view(back),
         Detail::Tailscale => crate::route_tiles::tailscale_view(back),
         Detail::Display => display_view(back),
@@ -538,6 +539,91 @@ fn bluetooth_view(back: Rc<dyn Fn()>) -> gtk::Widget {
             }
             b.append(&c);
         }
+    });
+    root.upcast()
+}
+
+// ---------- Devices (Flux) ----------
+
+/// Paired phones: who's connected, battery, ring and send the clipboard. Pairing and
+/// what each may do are in Settings › Connected Devices.
+fn devices_view(back: Rc<dyn Fn()>) -> gtk::Widget {
+    let root = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    root.add_css_class("cc-detail");
+    let (h, sw) = head("Devices", back);
+    sw.set_visible(false);
+    root.append(&h);
+    let body = gtk::Box::new(gtk::Orientation::Vertical, 0);
+    root.append(&scrolled(&body));
+    let settings = icon_button("emblem-system-symbolic", "Connected Devices settings: pair, and what each device may do");
+    settings.connect_clicked(|_| ui::open_settings("devices"));
+    root.append(&foot(&[settings]));
+    let b = body.clone();
+    bind(&root, devices::live(), move |st| {
+        clear(&b);
+        if !st.available {
+            let l = label(if st.installed { "Flux isn't running" } else { "Flux isn't installed" }, "cc-empty");
+            l.set_xalign(0.5);
+            b.append(&l);
+            if st.installed {
+                let start = gtk::Button::with_label("Start Flux");
+                start.set_halign(gtk::Align::Center);
+                start.connect_clicked(|_| act(devices::start_flux()));
+                b.append(&start);
+            }
+            return;
+        }
+        if !st.pairing.is_empty() {
+            b.append(&group("Asking to pair"));
+            let c = card();
+            for name in &st.pairing {
+                let r = row("dialog-password-symbolic", name, Some("Compare the key in Settings"));
+                on_click(&r, || ui::open_settings("devices"));
+                c.append(&r);
+            }
+            b.append(&c);
+        }
+        if st.devices.is_empty() {
+            let l = label("No paired devices yet", "cc-empty");
+            l.set_xalign(0.5);
+            b.append(&l);
+            return;
+        }
+        b.append(&group("Paired"));
+        let c = card();
+        for d in &st.devices {
+            let sub = match (d.connected, d.battery) {
+                (false, _) => "Not connected".to_string(),
+                (true, Some(p)) => format!("Connected · battery {p}%{}", if d.charging { ", charging" } else { "" }),
+                (true, None) => "Connected".into(),
+            };
+            let r = row(&d.icon, &d.name, Some(&sub));
+            set_class(&r, "selected", d.connected);
+            if d.can_clipboard {
+                let send = icon_button("edit-paste-symbolic", &format!("Send the clipboard to {}", d.name));
+                send.add_css_class("cc-row-button");
+                send.set_valign(gtk::Align::Center);
+                let id = d.id.clone();
+                send.connect_clicked(move |_| {
+                    let id = id.clone();
+                    act(async move { devices::send_clipboard(&id).await });
+                });
+                r.append(&send);
+            }
+            if d.can_ring {
+                let ring = icon_button("audio-volume-high-symbolic", &format!("Ring {}, to find it", d.name));
+                ring.add_css_class("cc-row-button");
+                ring.set_valign(gtk::Align::Center);
+                let id = d.id.clone();
+                ring.connect_clicked(move |_| {
+                    let id = id.clone();
+                    act(async move { devices::ring(&id).await });
+                });
+                r.append(&ring);
+            }
+            c.append(&r);
+        }
+        b.append(&c);
     });
     root.upcast()
 }

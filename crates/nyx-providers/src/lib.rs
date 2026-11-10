@@ -15,11 +15,13 @@
 //! | [`tailscale`] | `tailscale status --json` | read every 5 s while shown |
 //! | [`routes`] | NordVPN and Tor (`nordvpn`, `tormarchy`) | read every 4 s while shown |
 //! | [`dns`] | Omarchy's DNS provider (`omarchy-dns`) | read when shown |
+//! | [`devices`] | Flux's fluxd (Nyx Connect) | its socket's events |
 
 pub mod audio;
 pub mod bluetooth;
 pub mod brightness;
 pub mod calendar;
+pub mod devices;
 pub mod display;
 pub mod dns;
 pub mod home;

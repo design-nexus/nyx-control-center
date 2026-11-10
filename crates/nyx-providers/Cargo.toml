@@ -8,9 +8,12 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
+async-channel = "2"
 gio = "0.22"
 glib = "0.22"
 nyx-widgets = { path = "../nyx-widgets" }
+# Phones paired through Flux (Nyx Connect).
+nyx-connect = { git = "https://github.com/design-nexus/nyx-core.git", rev = "43d7c2e7684be8274c764619c5ac3886ed6b9438" }
 rusqlite = { version = "0.40", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
