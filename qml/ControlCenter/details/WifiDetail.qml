@@ -165,14 +165,57 @@ Column {
         Group {
             text: "DNS"
         }
+        // The servers as a row of icons, the chosen one lit.
         CardBox {
-            Repeater {
-                model: [["Cloudflare", "Cloudflare"], ["Google", "Google"], ["DHCP", "The network's own"], ["Custom", "Your own"]]
-                delegate: CcRow {
-                    required property var modelData
-                    title: modelData[1]
-                    selected: v.dnsState.dns === modelData[0]
-                    onClicked: v.ctx.call("dns.set_dns", { provider: modelData[0] })
+            Row {
+                id: dnsRow
+                width: parent.width
+                spacing: 4
+                Repeater {
+                    model: [["Cloudflare", "Cloudflare", "weather-overcast-symbolic", "Cloudflare: 1.1.1.1, with DNS over TLS"], ["Google", "Google", "system-search-symbolic", "Google: 8.8.8.8, with DNS over TLS"], ["DHCP", "Network", "network-wireless-symbolic", "The network's own: whatever the network you're on hands out"], ["Custom", "Custom", "document-edit-symbolic", "Custom: your own servers, typed in a terminal"]]
+                    delegate: Rectangle {
+                        id: dnsCell
+                        required property var modelData
+                        readonly property bool sel: v.dnsState.dns === modelData[0]
+                        width: (dnsRow.width - 3 * dnsRow.spacing) / 4
+                        height: 58
+                        radius: Style.radiusSmall
+                        color: sel ? Style.alpha(Style.accent, 0.16) : dnsArea.containsMouse ? Style.alpha(Style.text, 0.05) : "transparent"
+                        border.width: sel ? 1 : 0
+                        border.color: Style.alpha(Style.accent, 0.5)
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: Style.fast
+                            }
+                        }
+                        Icon {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: 9
+                            name: dnsCell.modelData[2]
+                            size: 22
+                            recolor: true
+                            color: dnsCell.sel ? Style.accent : Style.text
+                        }
+                        Label {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            y: 36
+                            text: dnsCell.modelData[1]
+                            size: 11
+                            color: dnsCell.sel ? Style.accent : Style.dimText
+                        }
+                        MouseArea {
+                            id: dnsArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: v.ctx.call("dns.set_dns", { provider: dnsCell.modelData[0] })
+                        }
+                        Tip {
+                            target: dnsCell
+                            text: dnsCell.modelData[3]
+                            shown: dnsArea.containsMouse
+                        }
+                    }
                 }
             }
         }
@@ -211,13 +254,13 @@ Column {
         }
         IconButton {
             visible: v.ctx.env.omarchy
-            icon: "qr-code-symbolic"
+            icon: "view-grid-symbolic"
             tooltip: "Share this network: a QR code a phone can scan to join"
             onClicked: v.ctx.call("dns.share_qr", {})
         }
         IconButton {
             visible: v.ctx.env.omarchy
-            icon: "speedometer-symbolic"
+            icon: "network-transmit-receive-symbolic"
             tooltip: "Speed test: measure download and upload"
             onClicked: v.ctx.call("dns.speed_test", {})
         }

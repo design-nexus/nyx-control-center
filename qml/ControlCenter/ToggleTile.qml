@@ -21,13 +21,27 @@ TileFrame {
     on: split && active && !compact
     onClicked: t.main()
 
+    // A one-cell tile is its icon: the whole tile takes the swatch when on, with a
+    // larger glyph, rather than a small chip inside a card.
+    readonly property color tintColor: t.ctx ? t.ctx.swatch(t.swatch) : Style.accent
+    color: compact ? (active ? (hovered ? Style.mix(tintColor, Style.text, 0.12) : tintColor) : (hovered ? Style.mix(Style.card, Style.text, 0.04) : Style.card)) : on && swatch !== "" && ctx ? Style.mix(Style.card, tintColor, tintAmount) : (clickable && hovered ? Style.mix(Style.card, Style.text, 0.04) : Style.card)
+    Icon {
+        visible: t.compact
+        anchors.centerIn: parent
+        name: t.icon
+        size: 22
+        recolor: true
+        color: t.active ? Style.bg : Style.text
+    }
+
     Chip {
         id: chip
+        visible: !t.compact
         anchors.verticalCenter: parent.verticalCenter
-        x: t.compact ? (t.width - width) / 2 : 9
+        x: 9
         icon: t.icon
         on: t.active
-        tint: t.ctx ? t.ctx.swatch(t.swatch) : "transparent"
+        tint: t.tintColor
     }
 
     Column {

@@ -41,7 +41,8 @@ ToggleTile {
                 width: 6
                 height: 2
                 radius: 1
-                color: (Math.min(5, t.max) - index) <= t.step ? t.ctx.swatch("teal") : Style.alpha(Style.text, 0.18)
+                // On the lit tile, in its ink; on the plain one, in the swatch.
+                color: (Math.min(5, t.max) - index) <= t.step ? (t.active ? Style.alpha(Style.bg, 0.85) : t.ctx.swatch("teal")) : (t.active ? Style.alpha(Style.bg, 0.3) : Style.alpha(Style.text, 0.18))
             }
         }
     }

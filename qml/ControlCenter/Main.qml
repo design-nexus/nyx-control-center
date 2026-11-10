@@ -133,29 +133,60 @@ Scope {
             }
         }
         color: "transparent"
+        // The surface is the whole height and never changes size: the card inside grows
+        // and shrinks (a detail view, a page of a different height) with an animation,
+        // and only the card takes input. Resizing the surface itself, frame by frame,
+        // made the compositor catch up a frame late each time: a jerky bounce.
         anchors.top: true
+        anchors.bottom: true
         anchors.right: true
         margins.top: 6
         margins.right: 6
+        margins.bottom: 6
         // Below the bar, as the GTK panel sat: others' reserved space is kept.
         exclusionMode: ExclusionMode.Normal
         exclusiveZone: 0
         implicitWidth: 400
-        implicitHeight: body.implicitHeight + 30
+        mask: Region {
+            item: card
+        }
+        // The card shows once the first layout has settled (rows sized, topics in),
+        // so it opens at its size instead of growing into it.
+        property bool settled: false
+        onVisibleChanged: {
+            settled = false;
+            if (visible)
+                settle.restart();
+        }
+        Timer {
+            id: settle
+            interval: 80
+            onTriggered: win.settled = true
+        }
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.namespace: "nyx-control-center"
         WlrLayershell.keyboardFocus: root.keyboardOff ? WlrKeyboardFocus.None : WlrKeyboardFocus.OnDemand
 
         Surface {
             id: card
-            anchors.fill: parent
+            width: parent.width
+            height: Math.min(parent.height, body.implicitHeight + 30)
             shadow: false
             outline: true
+            opacity: win.settled ? 1 : 0
+            Behavior on opacity {
+                NumberAnimation {
+                    duration: Style.reducedMotion ? 0 : 120
+                    easing.type: Easing.OutCubic
+                }
+            }
             Panel {
                 id: body
                 x: 14
                 y: 14
                 width: parent.width - 28
+                animate: win.settled
+                maxHeight: win.height - 30
                 ctx: ctx
                 focus: true
                 onVolumeMenu: a => {

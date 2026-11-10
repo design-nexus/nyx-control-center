@@ -1,4 +1,5 @@
 import QtQuick
+import Quickshell
 import Nyx.Shell
 import Nyx.Ui
 
@@ -11,6 +12,12 @@ FocusScope {
     readonly property var lay: ctx.client.state.layout || ({ pages: [], kinds: [], remember_page: true })
     readonly property var plugins: ctx.client.state.plugins || ({ kinds: [], off: [] })
     property string detail: ""
+    // Height changes animate once the panel has settled (not while it opens).
+    property bool animate: true
+    // The most the panel may be (the screen's room); a detail view taller than what's
+    // left below the header scrolls, as GTK's did.
+    property real maxHeight: 100000
+    readonly property real roomForContent: maxHeight - 52
     property var draft: null
     readonly property var pages: draft || lay.pages || []
     readonly property var pw: power.value
@@ -168,9 +175,10 @@ FocusScope {
         // ---------- Dashboard or detail ----------
         Item {
             width: parent.width
-            height: p.detail === "" ? dash.implicitHeight : Math.max(dash.implicitHeight, detailLoader.implicitHeight)
+            height: p.detail === "" ? dash.implicitHeight : Math.min(p.roomForContent, Math.max(dash.implicitHeight, detailLoader.implicitHeight))
             clip: true
             Behavior on height {
+                enabled: p.animate
                 NumberAnimation {
                     duration: Style.panelDuration
                     easing.type: Easing.OutCubic
@@ -194,9 +202,15 @@ FocusScope {
                 onChanged: newPages => p.save(newPages)
                 onVolumeMenu: a => p.volumeMenu(a)
             }
-            Loader {
-                id: detailLoader
+            Timer {
+                id: scrollTest
+                interval: 1500
+                onTriggered: detailFlick.contentY = Math.max(0, detailFlick.contentHeight - detailFlick.height)
+            }
+            Flickable {
+                id: detailFlick
                 width: parent.width
+                height: parent.height
                 x: p.detail === "" ? width + 24 : 0
                 Behavior on x {
                     NumberAnimation {
@@ -204,24 +218,37 @@ FocusScope {
                         easing.type: Easing.OutCubic
                     }
                 }
-                active: p.detail !== "" || x < width
-                property string which: p.detail
-                onWhichChanged: if (which !== "")
-                    shownDetail = which
-                property string shownDetail: ""
-                source: {
-                    const w = shownDetail;
-                    if (w === "")
-                        return "";
-                    if (w.indexOf("plugin:") === 0)
-                        return "details/PluginDetail.qml";
-                    return "details/" + ({ wifi: "Wifi", bluetooth: "Bluetooth", vpn: "Vpn", tailscale: "Tailscale", display: "Display", battery: "Battery" })[w] + "Detail.qml";
-                }
-                onLoaded: {
-                    item.ctx = Qt.binding(() => p.ctx);
-                    if (item.tileId !== undefined)
-                        item.tileId = shownDetail;
-                    item.back.connect(p.back);
+                contentHeight: detailLoader.implicitHeight
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                interactive: contentHeight > height
+                Loader {
+                    id: detailLoader
+                    width: parent.width
+                    active: p.detail !== "" || detailFlick.x < detailFlick.width
+                    property string which: p.detail
+                    onWhichChanged: if (which !== "") {
+                        shownDetail = which;
+                        detailFlick.contentY = 0;
+                    }
+                    property string shownDetail: ""
+                    source: {
+                        const w = shownDetail;
+                        if (w === "")
+                            return "";
+                        if (w.indexOf("plugin:") === 0)
+                            return "details/PluginDetail.qml";
+                        return "details/" + ({ wifi: "Wifi", bluetooth: "Bluetooth", vpn: "Vpn", tailscale: "Tailscale", display: "Display", battery: "Battery" })[w] + "Detail.qml";
+                    }
+                    onLoaded: {
+                        item.ctx = Qt.binding(() => p.ctx);
+                        if (item.tileId !== undefined)
+                            item.tileId = shownDetail;
+                        item.back.connect(p.back);
+                        // Screenshot hook: NYX_CC_TEST_SCROLL scrolls a detail view to its end.
+                        if (Quickshell.env("NYX_CC_TEST_SCROLL"))
+                            scrollTest.restart();
+                    }
                 }
             }
         }
