@@ -1,9 +1,11 @@
 import QtQuick
 import Nyx.Ui
 
-// A detail view's head: back, the title, and its switch.
+// A detail view's head: back, the title, and its switch. The panel keeps it in sight
+// above the scrolling view.
 Item {
     id: h
+    readonly property bool detailHead: true
     property string title: ""
     property bool hasSwitch: true
     property bool checked: false

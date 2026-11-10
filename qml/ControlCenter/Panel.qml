@@ -17,7 +17,7 @@ FocusScope {
     // The most the panel may be (the screen's room); a detail view taller than what's
     // left below the header scrolls, as GTK's did.
     property real maxHeight: 100000
-    readonly property real roomForContent: maxHeight - 52 - footHost.height
+    readonly property real roomForContent: maxHeight - 52
     property var draft: null
     readonly property var pages: draft || lay.pages || []
     readonly property var pw: power.value
@@ -175,7 +175,9 @@ FocusScope {
         // ---------- Dashboard or detail ----------
         Item {
             width: parent.width
-            height: p.detail === "" ? dash.implicitHeight : Math.min(p.roomForContent, Math.max(dash.implicitHeight, detailLoader.implicitHeight))
+            // A detail view is as tall as it needs (its head, what scrolls, its footer),
+            // up to the room there is.
+            height: p.detail === "" ? dash.implicitHeight : Math.min(p.roomForContent, headHost.height + detailLoader.implicitHeight + footHost.height)
             clip: true
             Behavior on height {
                 enabled: p.animate
@@ -207,8 +209,9 @@ FocusScope {
                 interval: 1500
                 onTriggered: detailFlick.contentY = Math.max(0, detailFlick.contentHeight - detailFlick.height)
             }
-            Flickable {
-                id: detailFlick
+            // The detail view: its head and footer stay in sight; between them it scrolls.
+            Item {
+                id: detailPane
                 width: parent.width
                 height: parent.height
                 x: p.detail === "" ? width + 24 : 0
@@ -218,51 +221,66 @@ FocusScope {
                         easing.type: Easing.OutCubic
                     }
                 }
-                contentHeight: detailLoader.implicitHeight
-                clip: true
-                boundsBehavior: Flickable.StopAtBounds
-                interactive: contentHeight > height
-                Loader {
-                    id: detailLoader
+                Item {
+                    id: headHost
                     width: parent.width
-                    active: p.detail !== "" || detailFlick.x < detailFlick.width
-                    property string which: p.detail
-                    onWhichChanged: if (which !== "") {
-                        shownDetail = which;
-                        detailFlick.contentY = 0;
-                    }
-                    property string shownDetail: ""
-                    source: {
-                        const w = shownDetail;
-                        if (w === "")
-                            return "";
-                        if (w.indexOf("plugin:") === 0)
-                            return "details/PluginDetail.qml";
-                        return "details/" + ({ wifi: "Wifi", bluetooth: "Bluetooth", vpn: "Vpn", tailscale: "Tailscale", display: "Display", battery: "Battery" })[w] + "Detail.qml";
-                    }
-                    onLoaded: {
-                        item.ctx = Qt.binding(() => p.ctx);
-                        if (item.tileId !== undefined)
-                            item.tileId = shownDetail;
-                        item.back.connect(p.back);
-                        // Its footer goes below the scrolling view.
-                        for (const c of item.children)
-                            if (c.detailFoot)
-                                c.parent = footHost;
-                        // Screenshot hook: NYX_CC_TEST_SCROLL scrolls a detail view to its end.
-                        if (Quickshell.env("NYX_CC_TEST_SCROLL"))
-                            scrollTest.restart();
+                    height: childrenRect.height
+                }
+                Item {
+                    id: footHost
+                    y: parent.height - height
+                    width: parent.width
+                    height: childrenRect.height
+                }
+                Flickable {
+                    id: detailFlick
+                    y: headHost.height
+                    width: parent.width
+                    height: parent.height - headHost.height - footHost.height
+                    contentHeight: detailLoader.implicitHeight
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+                    interactive: contentHeight > height
+                    Loader {
+                        id: detailLoader
+                        width: parent.width
+                        active: p.detail !== "" || detailPane.x < detailPane.width
+                        property string which: p.detail
+                        onWhichChanged: if (which !== "") {
+                            shownDetail = which;
+                            detailFlick.contentY = 0;
+                        }
+                        property string shownDetail: ""
+                        source: {
+                            const w = shownDetail;
+                            if (w === "")
+                                return "";
+                            if (w.indexOf("plugin:") === 0)
+                                return "details/PluginDetail.qml";
+                            return "details/" + ({ wifi: "Wifi", bluetooth: "Bluetooth", vpn: "Vpn", tailscale: "Tailscale", display: "Display", battery: "Battery" })[w] + "Detail.qml";
+                        }
+                        onLoaded: {
+                            item.ctx = Qt.binding(() => p.ctx);
+                            if (item.tileId !== undefined)
+                                item.tileId = shownDetail;
+                            item.back.connect(p.back);
+                            // Its head and footer stay put above and below what scrolls.
+                            // (Out of the page's column they keep the place it gave them,
+                            // so they go back to the top of their own.)
+                            for (const c of item.children.slice()) {
+                                if (c.detailHead || c.detailFoot) {
+                                    c.parent = c.detailHead ? headHost : footHost;
+                                    c.x = 0;
+                                    c.y = 0;
+                                }
+                            }
+                            // Screenshot hook: NYX_CC_TEST_SCROLL scrolls a detail view to its end.
+                            if (Quickshell.env("NYX_CC_TEST_SCROLL"))
+                                scrollTest.restart();
+                        }
                     }
                 }
             }
-        }
-
-        // ---------- A detail view's footer, outside its scrolling ----------
-        Item {
-            id: footHost
-            width: parent.width
-            visible: p.detail !== ""
-            height: visible ? childrenRect.height : 0
         }
 
         // ---------- Dots ----------
