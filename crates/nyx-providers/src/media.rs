@@ -103,14 +103,26 @@ fn player_state(bus: &gio::DBusConnection, name: &str) -> Option<State> {
     Some(st)
 }
 
+/// Whether `name` is WebKit's player for a web page inside an app that has a player of its
+/// own: WebKitGTK publishes a page's media as `org.mpris.MediaPlayer2.<app ID>.Sandboxed.
+/// instance-N`, and an app like Lyra publishes its own with that ID as its `DesktopEntry`
+/// (as `nyx_plugin_sdk::services::mpris::webkit_duplicate`).
+fn webkit_duplicate(name: &str, desktop_entries: &[String]) -> bool {
+    name.strip_prefix("org.mpris.MediaPlayer2.")
+        .and_then(|rest| rest.split_once(".Sandboxed.instance-"))
+        .is_some_and(|(app, _)| desktop_entries.iter().any(|e| e.trim_end_matches(".desktop") == app))
+}
+
 fn read(bus: &gio::DBusConnection, last: &str) -> State {
     let Some(names) = call(bus, "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus", "ListNames", None)
         .and_then(|v| v.child_value(0).get::<Vec<String>>())
     else {
         return State::default();
     };
-    let players: Vec<State> =
+    let mut players: Vec<State> =
         names.iter().filter(|n| n.starts_with("org.mpris.MediaPlayer2.")).filter_map(|n| player_state(bus, n)).collect();
+    let entries: Vec<String> = players.iter().map(|p| p.app.clone()).filter(|a| !a.is_empty()).collect();
+    players.retain(|p| !webkit_duplicate(&p.player, &entries));
     players
         .iter()
         .find(|p| p.playing)
@@ -189,4 +201,17 @@ pub fn command(method: &str) {
         return;
     }
     bus.call(Some(&player), PATH, PLAYER, method, None, None, gio::DBusCallFlags::NONE, 1000, gio::Cancellable::NONE, |_| {});
+}
+
+#[cfg(test)]
+mod tests {
+    use super::webkit_duplicate;
+
+    #[test]
+    fn webkit_players_of_apps_with_their_own_are_dropped() {
+        let entries = vec!["io.github.design_nexus.nyx.Lyra".to_string()];
+        assert!(webkit_duplicate("org.mpris.MediaPlayer2.io.github.design_nexus.nyx.Lyra.Sandboxed.instance-7113", &entries));
+        assert!(!webkit_duplicate("org.mpris.MediaPlayer2.lyra", &entries));
+        assert!(!webkit_duplicate("org.mpris.MediaPlayer2.org.gnome.Epiphany.Sandboxed.instance-1", &entries));
+    }
 }
