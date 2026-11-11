@@ -90,9 +90,14 @@ pub async fn set_band(band: &str) -> Result<(), String> {
     r
 }
 
-/// Open the network's sign-in page.
+/// Open the network's sign-in page: Omarchy's portal window, or (NyxOS) the browser at a
+/// plain-HTTP page, which the portal intercepts.
 pub fn sign_in() {
-    crate::spawn(&["omarchy-network-captive-portal", "http://ping.omacom.io/nm-check.txt"]);
+    if crate::omarchy::here() {
+        crate::spawn(&["omarchy-network-captive-portal", "http://ping.omacom.io/nm-check.txt"]);
+    } else {
+        crate::spawn(&["xdg-open", "http://nmcheck.gnome.org/check_network_status.txt"]);
+    }
 }
 
 /// Omarchy's speed test and share-by-QR panels.

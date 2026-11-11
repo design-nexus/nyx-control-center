@@ -148,7 +148,7 @@ pub fn refresh(set: Setter<State>) {
         if let Some(list) = output(&["tailscale", "switch", "--list"]).await {
             st.accounts = parse_accounts(&list);
         }
-        st.receiving = output(&["systemctl", "--user", "is-active", RECEIVER]).await.is_some_and(|s| s.trim() == "active");
+        st.receiving = output(&["systemctl", "--user", "is-active", receiver()]).await.is_some_and(|s| s.trim() == "active");
         set.set(st);
     });
 }
@@ -175,11 +175,38 @@ pub async fn set_advertise_exit(on: bool) -> Result<(), String> {
     act(&["tailscale", "set", &arg]).await
 }
 
-const RECEIVER: &str = "omarchy-tailscale-receive.service";
+/// Omarchy's Taildrop receiver; without Omarchy (NyxOS) a user unit of the Control
+/// Center's own, running for the session.
+fn receiver() -> &'static str {
+    if crate::omarchy::here() { "omarchy-tailscale-receive.service" } else { "nyx-tailscale-receive.service" }
+}
 
-/// Save files sent to this machine (Taildrop) to Downloads, now and at login, or not.
+/// Save files sent to this machine (Taildrop) to Downloads, now (and at login, with
+/// Omarchy's unit), or not.
 pub async fn set_receiving(on: bool) -> Result<(), String> {
-    act(&["systemctl", "--user", if on { "enable" } else { "disable" }, "--now", RECEIVER]).await
+    if crate::omarchy::here() {
+        return act(&["systemctl", "--user", if on { "enable" } else { "disable" }, "--now", receiver()]).await;
+    }
+    if !on {
+        return act(&["systemctl", "--user", "stop", receiver()]).await;
+    }
+    let downloads = glib::user_special_dir(glib::UserDirectory::Downloads).unwrap_or_else(|| glib::home_dir().join("Downloads"));
+    let downloads = downloads.to_string_lossy().to_string();
+    act(&[
+        "systemd-run",
+        "--user",
+        "--unit",
+        receiver(),
+        "--description",
+        "Receive Taildrop files (Control Center)",
+        "tailscale",
+        "file",
+        "get",
+        "--loop",
+        "--conflict=rename",
+        &downloads,
+    ])
+    .await
 }
 
 pub async fn switch(account_id: &str) -> Result<(), String> {
