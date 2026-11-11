@@ -58,10 +58,12 @@ Item {
             }
         }
         Rectangle {
-            width: 14
-            height: 14
-            radius: 7
+            width: 16
+            height: 16
+            radius: 8
             color: "white"
+            border.width: 1
+            border.color: Style.alpha(Style.shadow, 0.25)
             anchors.verticalCenter: parent.verticalCenter
             x: Math.max(0, Math.min(parent.width - width, parent.width * track.fraction - width / 2))
         }

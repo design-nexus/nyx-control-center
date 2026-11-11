@@ -96,14 +96,6 @@ Column {
             sub: "No VPN: traffic goes straight out"
             selected: v.route === "direct"
             onClicked: v.ctx.call("routes.direct", {})
-            Icon {
-                visible: v.route === "direct"
-                anchors.verticalCenter: parent.verticalCenter
-                name: "object-select-symbolic"
-                size: 14
-                recolor: true
-                color: Style.text
-            }
         }
         CcRow {
             visible: !!v.nord.installed

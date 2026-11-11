@@ -243,6 +243,212 @@ fn read_details(set: Setter<Option<Details>>) {
     });
 }
 
+// ---------------------------------------------------------------- Battery history
+
+/// The battery's charge over the last day (UPower's history, which the summary
+/// "DisplayDevice" doesn't keep), and the apps using the processor most now, the
+/// likeliest drains: an estimate from their share of the processor, not a measurement.
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
+pub struct History {
+    /// Oldest first. UPower records a point when the charge or state changes, so a
+    /// flat stretch has none: each point holds until the next.
+    pub points: Vec<Point>,
+    /// The apps using the most processor time, most first.
+    pub energy: Vec<Hog>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
+pub struct Point {
+    /// Unix seconds.
+    pub time: i64,
+    /// 0–100
+    pub percent: f64,
+    pub charging: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
+pub struct Hog {
+    pub app: String,
+    /// Percent of one processor core, averaged over the last minute or so.
+    pub cpu: f64,
+}
+
+const DAY: u32 = 24 * 3600;
+
+/// The first battery that powers the computer (UPower type 2, `PowerSupply`).
+fn battery_path(bus: &gio::DBusConnection) -> Option<String> {
+    let reply = bus
+        .call_sync(
+            Some("org.freedesktop.UPower"),
+            "/org/freedesktop/UPower",
+            "org.freedesktop.UPower",
+            "EnumerateDevices",
+            None,
+            None,
+            gio::DBusCallFlags::NONE,
+            1000,
+            gio::Cancellable::NONE,
+        )
+        .ok()?;
+    let list = reply.child_value(0);
+    (0..list.n_children()).filter_map(|i| list.child_value(i).str().map(String::from)).find(|path| {
+        props(bus, ("org.freedesktop.UPower", path, UPOWER.2)).is_some_and(|p| {
+            p.lookup::<u32>("Type").ok().flatten() == Some(2) && p.lookup::<bool>("PowerSupply").ok().flatten().unwrap_or(false)
+        })
+    })
+}
+
+/// UPower's `(time, value, state)` records, newest first, to points oldest first.
+/// Unknown states (0) are dropped; states 1 and 5 (pending charge) count as charging.
+pub fn points_of(records: &[(u32, f64, u32)], since: i64) -> Vec<Point> {
+    let mut out: Vec<Point> = records
+        .iter()
+        .filter(|(t, _, s)| *s != 0 && *t as i64 >= since)
+        .map(|&(t, v, s)| Point { time: t as i64, percent: v.clamp(0.0, 100.0), charging: s == 1 || s == 5 })
+        .collect();
+    out.sort_by_key(|p| p.time);
+    out.dedup_by_key(|p| p.time);
+    out
+}
+
+fn read_points(bus: &gio::DBusConnection) -> Vec<Point> {
+    let Some(path) = battery_path(bus) else { return vec![] };
+    let Ok(reply) = bus.call_sync(
+        Some("org.freedesktop.UPower"),
+        &path,
+        UPOWER.2,
+        "GetHistory",
+        Some(&("charge", DAY, 200u32).to_variant()),
+        None,
+        gio::DBusCallFlags::NONE,
+        2000,
+        gio::Cancellable::NONE,
+    ) else {
+        return vec![];
+    };
+    let list = reply.child_value(0);
+    let records: Vec<(u32, f64, u32)> = (0..list.n_children()).filter_map(|i| list.child_value(i).get::<(u32, f64, u32)>()).collect();
+    let now = glib::real_time() / 1_000_000;
+    points_of(&records, now - DAY as i64)
+}
+
+/// Processor ticks used so far by each program (its executable's name), from /proc.
+/// Kernel threads (no executable) are left out.
+fn cpu_ticks() -> std::collections::HashMap<String, u64> {
+    let mut out = std::collections::HashMap::new();
+    let Ok(dir) = std::fs::read_dir("/proc") else { return out };
+    for e in dir.flatten() {
+        let name = e.file_name();
+        if !name.to_string_lossy().bytes().all(|b| b.is_ascii_digit()) {
+            continue;
+        }
+        let Ok(exe) = std::fs::read_link(e.path().join("exe")) else { continue };
+        let Ok(stat) = std::fs::read_to_string(e.path().join("stat")) else { continue };
+        let Some(ticks) = stat_ticks(&stat) else { continue };
+        let app = exe.file_name().map(|n| n.to_string_lossy().trim_end_matches(" (deleted)").to_string()).unwrap_or_default();
+        if !app.is_empty() {
+            *out.entry(app).or_insert(0) += ticks;
+        }
+    }
+    out
+}
+
+/// utime + stime from a /proc/PID/stat line (fields 14 and 15, after the name in
+/// parentheses, which may hold spaces).
+pub fn stat_ticks(stat: &str) -> Option<u64> {
+    let rest = &stat[stat.rfind(')')? + 2..];
+    let f: Vec<&str> = rest.split_whitespace().collect();
+    Some(f.get(11)?.parse::<u64>().ok()? + f.get(12)?.parse::<u64>().ok()?)
+}
+
+/// The busiest programs between two samples `secs` apart, smoothed into `avg`.
+pub fn hogs(
+    before: &std::collections::HashMap<String, u64>,
+    after: &std::collections::HashMap<String, u64>,
+    secs: f64,
+    avg: &mut std::collections::HashMap<String, f64>,
+) -> Vec<Hog> {
+    // USER_HZ, 100 on every Linux the desktop runs on.
+    let hz = 100.0;
+    for (app, t) in after {
+        let used = t.saturating_sub(*before.get(app).unwrap_or(t)) as f64 / (secs * hz) * 100.0;
+        let a = avg.entry(app.clone()).or_insert(used);
+        *a = *a * 0.6 + used * 0.4;
+    }
+    avg.retain(|app, a| after.contains_key(app) && *a >= 0.5);
+    let mut list: Vec<Hog> = avg.iter().filter(|(_, a)| **a >= 5.0).map(|(app, a)| Hog { app: pretty(app), cpu: (*a * 10.0).round() / 10.0 }).collect();
+    list.sort_by(|a, b| b.cpu.total_cmp(&a.cpu));
+    list.truncate(4);
+    list
+}
+
+fn pretty(program: &str) -> String {
+    let mut c = program.chars();
+    c.next().map(|f| f.to_uppercase().collect::<String>() + c.as_str()).unwrap_or_default()
+}
+
+thread_local! {
+    static HISTORY: Live<History> = Live::new(History::default(), start_history);
+}
+
+pub fn history() -> Live<History> {
+    HISTORY.with(|l| l.clone())
+}
+
+fn start_history(set: Setter<History>) -> Box<dyn Stop> {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    let bus = system_bus();
+    let points = bus.as_ref().map(read_points).unwrap_or_default();
+    set.set(History { points: points.clone(), energy: vec![] });
+    // Processor use: a first sample now and every 10 s; the charge again every minute.
+    let state = Rc::new(RefCell::new((cpu_ticks(), std::time::Instant::now(), std::collections::HashMap::new(), points, 0u32)));
+    let id = glib::timeout_add_local(std::time::Duration::from_secs(10), move || {
+        let mut s = state.borrow_mut();
+        let now_ticks = cpu_ticks();
+        let secs = s.1.elapsed().as_secs_f64().max(1.0);
+        let (before, _, avg, points, n) = &mut *s;
+        let energy = hogs(before, &now_ticks, secs, avg);
+        *n += 1;
+        if *n % 6 == 0
+            && let Some(b) = bus.as_ref()
+        {
+            *points = read_points(b);
+        }
+        let points = points.clone();
+        s.0 = now_ticks;
+        s.1 = std::time::Instant::now();
+        set.set(History { points, energy });
+        glib::ControlFlow::Continue
+    });
+    Box::new(crate::TimerStop(Some(id)))
+}
+
+#[cfg(test)]
+mod history_tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn upower_records_to_points() {
+        let p = points_of(&[(300, 80.0, 2), (200, 0.0, 0), (100, 95.0, 1), (50, 99.0, 4)], 60);
+        assert_eq!(
+            p,
+            vec![Point { time: 100, percent: 95.0, charging: true }, Point { time: 300, percent: 80.0, charging: false }]
+        );
+    }
+
+    #[test]
+    fn processor_ticks_and_hogs() {
+        assert_eq!(stat_ticks("1234 (Web Content) S 1 2 3 4 5 6 7 8 9 10 250 50 0 0"), Some(300));
+        let before = HashMap::from([("firefox".to_string(), 1000u64), ("bash".to_string(), 10)]);
+        let after = HashMap::from([("firefox".to_string(), 1500u64), ("bash".to_string(), 10)]);
+        let mut avg = HashMap::new();
+        let h = hogs(&before, &after, 10.0, &mut avg);
+        assert_eq!(h, vec![Hog { app: "Firefox".into(), cpu: 50.0 }]);
+    }
+}
+
 #[cfg(test)]
 mod detail_tests {
     #[test]

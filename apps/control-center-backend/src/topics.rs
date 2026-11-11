@@ -150,6 +150,7 @@ fn start(app: &Rc<App>, topic: &str) -> Option<Box<dyn Any>> {
         }),
         "power" => bind(app, "power", power::live(), power_json),
         "power-details" => bind(app, "power-details", power::details(), plain),
+        "power-history" => bind(app, "power-history", power::history(), plain),
         "calendar" => bind(app, "calendar", calendar::live(), calendar_json),
         "home" => bind(app, "home", home::live(), plain),
         "omarchy" => bind(app, "omarchy", omarchy::live(), plain),

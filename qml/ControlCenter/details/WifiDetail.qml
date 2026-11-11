@@ -136,7 +136,7 @@ Column {
         Group {
             text: "Connection"
         }
-        CardBox {
+        FactGrid {
             Fact { name: "Address"; value: v.d ? (v.d.prefix ? v.d.ip + "/" + v.d.prefix : v.d.ip) : "" }
             Fact { name: "Router"; value: v.d ? v.d.gateway : "" }
             Fact { name: "Router ping"; value: v.d ? v.ms(v.d.router_ping_ms) : "" }

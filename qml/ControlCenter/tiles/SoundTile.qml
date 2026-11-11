@@ -3,9 +3,9 @@ import Nyx.Shell
 import Nyx.Ui
 import ".."
 
-// Sound & brightness: the volume row (outputs and apps behind its icon, mute at the
-// end) and the brightness row (Screens behind its icon), one row tall when no
-// screen's brightness can be set.
+// Sound & brightness: the volume row (the Sound page behind its icon, mute at the end)
+// and the brightness row (Screens behind its icon), one row tall when no screen's
+// brightness can be set.
 TileFrame {
     id: t
     property int cols: 4
@@ -29,7 +29,7 @@ TileFrame {
             width: parent.width
             height: t.br.screen || t.ctx.editing ? parent.height / 2 : parent.height
             icon: t.au.muted ? "audio-volume-muted-symbolic" : t.au.volume < 0.34 ? "audio-volume-low-symbolic" : t.au.volume < 0.67 ? "audio-volume-medium-symbolic" : "audio-volume-high-symbolic"
-            iconTip: "Sound: outputs and each app's volume"
+            iconTip: "Sound: outputs, each app's volume and the microphone"
             tint: t.ctx.swatch("blue")
             to: 1.5
             value: t.au.volume || 0
@@ -40,7 +40,7 @@ TileFrame {
             endOn: !!t.au.muted
             debounce: 40
             onMoved: v => t.ctx.call("audio.set_volume", { value: v })
-            onIconClicked: t.volumeMenu(vol.iconItem)
+            onIconClicked: t.ctx.openDetail("sound")
             onEndClicked: t.ctx.call("audio.set_muted", { on: !t.au.muted })
         }
         SliderRow {

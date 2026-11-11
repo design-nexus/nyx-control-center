@@ -1,8 +1,8 @@
 import QtQuick
 import Nyx.Ui
 
-// A toggle tile (1×1: its icon, centred; wider: icon, name and status) or, with
-// `split`, a split tile: the main part acts, the arrow opens the detail view.
+// A toggle tile (1×1: its round icon over its name; wider: icon, name and status) or,
+// with `split`, a split tile: the main part acts, the chevron opens the detail view.
 TileFrame {
     id: t
 
@@ -12,43 +12,50 @@ TileFrame {
     property bool active: false
     property bool split: false
     property bool compact: width < 100
-    // A word under a one-cell tile's icon (the workspace mode's name).
+    // The word under a one-cell tile's icon in place of its name (the workspace mode's).
     property string compactLabel: ""
     property string moreTip: title + ": networks, devices and settings"
+    // A one-cell tile's icon and name need this much height.
+    readonly property real need: compact ? 66 : 0
 
     signal main
     signal more
 
     clickable: !split || compact
-    on: split && active && !compact
+    on: active && (compact || split)
     onClicked: t.main()
 
-    // A one-cell tile is its icon: the whole tile takes the swatch when on, with a
-    // larger glyph, rather than a small chip inside a card.
     readonly property color tintColor: t.ctx ? t.ctx.swatch(t.swatch) : Style.accent
-    color: compact ? (active ? (hovered ? Style.mix(tintColor, Style.text, 0.12) : tintColor) : (hovered ? Style.mix(Style.card, Style.text, 0.04) : Style.card)) : on && swatch !== "" && ctx ? Style.mix(Style.card, tintColor, tintAmount) : (clickable && hovered ? Style.mix(Style.card, Style.text, 0.04) : Style.card)
-    Icon {
+    color: on && swatch !== "" && ctx ? Style.mix(Style.card, tintColor, hovered && clickable ? tintAmount + 0.05 : tintAmount) : (clickable && hovered ? Style.mix(Style.card, Style.text, 0.04) : Style.card)
+
+    Chip {
         id: glyph
         visible: t.compact
-        anchors.centerIn: parent
-        anchors.verticalCenterOffset: t.compactLabel !== "" ? -7 : 0
-        name: t.icon
-        size: 22
-        recolor: true
-        color: t.active ? Style.bg : Style.text
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: Math.max(6, (parent.height - height - name.implicitHeight - 5) / 2)
+        width: 32
+        height: 32
+        icon: t.icon
+        iconSize: 17
+        on: t.active
+        tint: t.tintColor
     }
 
     Label {
-        visible: t.compact && t.compactLabel !== ""
+        id: name
+        visible: t.compact
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: glyph.bottom
-        anchors.topMargin: 3
+        anchors.topMargin: 5
         width: parent.width - 8
         horizontalAlignment: Text.AlignHCenter
+        wrapMode: Text.WordWrap
+        maximumLineCount: 2
         elide: Text.ElideRight
-        text: t.compactLabel
-        size: 10
-        color: t.active ? Style.bg : Style.text
+        text: t.compactLabel !== "" ? t.compactLabel : t.title
+        size: 10.5
+        lineHeight: 0.95
     }
 
     Chip {
@@ -109,7 +116,7 @@ TileFrame {
         }
         Icon {
             anchors.centerIn: parent
-            name: "go-next-symbolic"
+            name: "pan-end-symbolic"
             size: 14
             recolor: true
             color: moreArea.containsMouse ? Style.text : Style.dimText

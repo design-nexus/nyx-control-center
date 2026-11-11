@@ -21,14 +21,15 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         icon: "go-previous-symbolic"
         tooltip: "Back (Esc)"
+        radius: width / 2
         onClicked: h.back()
     }
     Label {
         anchors.left: backButton.right
-        anchors.leftMargin: 4
+        anchors.leftMargin: 6
         anchors.verticalCenter: parent.verticalCenter
         text: h.title
-        size: 13.5
+        size: 14.5
         font.weight: Font.DemiBold
     }
     Toggle {

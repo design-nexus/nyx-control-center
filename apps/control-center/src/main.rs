@@ -94,10 +94,12 @@ fn main() -> std::process::ExitCode {
         let args: Vec<String> = cmd.arguments().iter().skip(1).map(|a| a.to_string_lossy().to_string()).collect();
         if args.iter().any(|a| a == "-h" || a == "--help") {
             println!(
-                "Usage: nyx-control-center [--toggle [wifi|bluetooth|vpn] | --show | --hide] [--only <output>]\n       nyx-control-center --ui [qml|gtk]\n\n\
+                "Usage: nyx-control-center [--toggle [PAGE] | --show | --hide] [--only <output>]\n       nyx-control-center --ui [qml|gtk]\n\n\
                  With no option, start (hidden). The options open or close the running one;\n\
-                 --toggle with a list's name opens it on that list. --ui switches between the\n\
-                 GTK interface and the Quickshell one (or says which is on)."
+                 --toggle with a page's name opens it on that page: wifi, bluetooth, vpn,\n\
+                 tailscale, devices, display, battery, or sound (the Quickshell interface).\n\
+                 --ui switches between the GTK interface and the Quickshell one (or says\n\
+                 which is on)."
             );
             return glib::ExitCode::SUCCESS;
         }

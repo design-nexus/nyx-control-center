@@ -1,8 +1,8 @@
 import QtQuick
 import Nyx.Ui
 
-// A row in a detail view: icon, title and sub-line, trailing items; selected rows in
-// an accent tint with the icon in the accent.
+// A row in a detail view: its icon in a disc, title and sub-line, trailing items. A
+// selected row is tinted in the accent, its disc filled with it, and ends in a tick.
 Rectangle {
     id: r
 
@@ -12,14 +12,22 @@ Rectangle {
     property bool selected: false
     property bool clickable: true
     property bool hovered: area.containsMouse
+    // The tick on a selected row: a choice among rows, not a connected device with its
+    // own buttons.
+    property bool tick: clickable
     default property alias trailing: tail.data
 
     signal clicked
 
     width: parent ? parent.width : 300
-    implicitHeight: Math.max(36, texts.implicitHeight + 10)
+    implicitHeight: Math.max(40, texts.implicitHeight + 12)
     radius: Style.radiusSmall
-    color: selected ? Style.alpha(Style.accent, 0.16) : (clickable && hovered ? Style.alpha(Style.text, 0.04) : "transparent")
+    color: selected ? Style.alpha(Style.accent, hovered && clickable ? 0.2 : 0.14) : (clickable && hovered ? Style.alpha(Style.text, 0.05) : "transparent")
+    Behavior on color {
+        ColorAnimation {
+            duration: Style.fast
+        }
+    }
 
     MouseArea {
         id: area
@@ -29,20 +37,27 @@ Rectangle {
         cursorShape: r.clickable ? Qt.PointingHandCursor : Qt.ArrowCursor
         onClicked: r.clicked()
     }
-    Icon {
-        id: ic
+    Rectangle {
+        id: disc
         visible: r.icon !== ""
-        x: 8
+        x: 6
         anchors.verticalCenter: parent.verticalCenter
-        name: r.icon
-        size: 16
-        recolor: true
-        color: r.selected ? Style.accent : Style.dimText
+        width: 26
+        height: 26
+        radius: 13
+        color: r.selected ? Style.accent : Style.alpha(Style.text, 0.08)
+        Icon {
+            anchors.centerIn: parent
+            name: r.icon
+            size: 14
+            recolor: true
+            color: r.selected ? Style.onAccent : Style.dimText
+        }
     }
     Column {
         id: texts
-        anchors.left: ic.visible ? ic.right : parent.left
-        anchors.leftMargin: ic.visible ? 10 : 8
+        anchors.left: disc.visible ? disc.right : parent.left
+        anchors.leftMargin: disc.visible ? 10 : 8
         anchors.right: tail.left
         anchors.rightMargin: 6
         anchors.verticalCenter: parent.verticalCenter
@@ -61,9 +76,20 @@ Rectangle {
     }
     Row {
         id: tail
-        anchors.right: parent.right
+        anchors.right: check.visible ? check.left : parent.right
         anchors.rightMargin: 6
         anchors.verticalCenter: parent.verticalCenter
         spacing: 4
+    }
+    Icon {
+        id: check
+        visible: r.selected && r.tick
+        anchors.right: parent.right
+        anchors.rightMargin: 10
+        anchors.verticalCenter: parent.verticalCenter
+        name: "object-select-symbolic"
+        size: 14
+        recolor: true
+        color: Style.accent
     }
 }

@@ -96,11 +96,14 @@ pub fn default_pages() -> Vec<Page> {
                 t("sound", S::S4X2),
                 t("media", S::S4X2),
                 t("power", S::S2X1),
+                t("battery", S::S2X1),
+                t("devices", S::S1X1),
+                t("microphone", S::S1X1),
                 t("keyboard-light", S::S1X1),
                 t("capture", S::S1X1),
             ],
         },
-        Page { tiles: vec![t("upcoming", S::S4X3), t("microphone", S::S1X1), t("battery", S::S1X1), t("home", S::S4X3)] },
+        Page { tiles: vec![t("upcoming", S::S4X3), t("home", S::S4X3)] },
     ]
 }
 
