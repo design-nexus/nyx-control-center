@@ -6,9 +6,9 @@ import Nyx.Ui
 
 // Nyx Control Center in the shared Quickshell runtime. Its backend
 // (nyx-control-center-backend) owns the bus name and Panel1 and decides when the panel
-// is open; this draws it: a 400 px card at the top right of the focused screen, with a
-// clear catcher behind it that closes it on a click anywhere else. The layer
-// namespaces are the GTK panel's, so Shell Core and other tools see the same surfaces.
+// is open; this draws it: a 400 px card at the top right of the focused screen, on a
+// clear surface over the whole screen that closes it on a click anywhere else. The
+// layer namespace is the GTK panel's, so Shell Core and other tools see the same surface.
 Scope {
     id: root
 
@@ -100,60 +100,33 @@ Scope {
     readonly property var targetScreen: Quickshell.screens.find(s => s.name === screenName) || Quickshell.screens[0] || null
 
     PanelWindow {
-        id: catcher
+        id: win
         screen: root.targetScreen
         visible: root.open && root.targetScreen !== null
+        // The whole screen, over the bar and the dock, and it never changes size: the
+        // card inside grows and shrinks (a detail view, a page of a different height)
+        // with an animation. Resizing the surface itself, frame by frame, made the
+        // compositor catch up a frame late each time: a jerky bounce. A click anywhere
+        // around the card closes it, here and not on a surface of its own: Hyprland
+        // gives the pointer only to a layer that holds the keyboard exclusively.
         color: Qt.rgba(0, 0, 0, 0.004)
         anchors.top: true
         anchors.bottom: true
         anchors.left: true
         anchors.right: true
         exclusionMode: ExclusionMode.Ignore
-        WlrLayershell.layer: WlrLayer.Overlay
-        WlrLayershell.namespace: "nyx-control-center-catcher"
-        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+        // The card sits below the bar, as the GTK panel did: others' reserved space is kept.
+        readonly property var monitor: root.targetScreen ? DesktopState.monitor(root.targetScreen.name) : null
+        readonly property var reserved: (monitor && monitor.reserved) || [0, 0, 0, 0]
         // Only once the card is on screen: a second press while it's still appearing
-        // doesn't close it unseen.
+        // doesn't close it unseen. On the release, not the press: a surface gone with a
+        // button still down left that button held for the next opening, which then saw
+        // no hovering (no tooltips) until a click.
         MouseArea {
             anchors.fill: parent
             enabled: win.settled
             acceptedButtons: Qt.AllButtons
-            onPressed: ctx.hide()
-        }
-    }
-
-    PanelWindow {
-        id: win
-        screen: root.targetScreen
-        // After the catcher, so it stacks above it.
-        visible: catcher.visible && catcherShown
-        property bool catcherShown: false
-        Connections {
-            target: catcher
-            function onVisibleChanged() {
-                if (catcher.visible)
-                    Qt.callLater(() => win.catcherShown = true);
-                else
-                    win.catcherShown = false;
-            }
-        }
-        color: "transparent"
-        // The surface is the whole height and never changes size: the card inside grows
-        // and shrinks (a detail view, a page of a different height) with an animation,
-        // and only the card takes input. Resizing the surface itself, frame by frame,
-        // made the compositor catch up a frame late each time: a jerky bounce.
-        anchors.top: true
-        anchors.bottom: true
-        anchors.right: true
-        margins.top: 6
-        margins.right: 6
-        margins.bottom: 6
-        // Below the bar, as the GTK panel sat: others' reserved space is kept.
-        exclusionMode: ExclusionMode.Normal
-        exclusiveZone: 0
-        implicitWidth: 400
-        mask: Region {
-            item: card
+            onReleased: ctx.hide()
         }
         // The card shows once the first layout has settled (rows sized, topics in),
         // so it opens at its size instead of growing into it.
@@ -178,13 +151,16 @@ Scope {
         WlrLayershell.namespace: "nyx-control-center"
         // Exclusive while open, as Glimpse's: on-demand focus goes back to the last
         // window whenever another layer closes, so the panel had the keyboard only once
-        // clicked. The catcher makes it modal anyway.
+        // clicked. Clicks around the card close it, so it's modal anyway.
         WlrLayershell.keyboardFocus: root.keyboardOff ? WlrKeyboardFocus.None : WlrKeyboardFocus.Exclusive
 
         Surface {
             id: card
-            width: parent.width
-            height: Math.min(parent.height, body.implicitHeight + 30)
+            readonly property real room: win.height - win.reserved[1] - win.reserved[3] - 12
+            x: win.width - width - win.reserved[2] - 6
+            y: win.reserved[1] + 6
+            width: 400
+            height: Math.min(room, body.implicitHeight + 30)
             shadow: false
             outline: true
             opacity: win.settled ? 1 : 0
@@ -194,13 +170,18 @@ Scope {
                     easing.type: Easing.OutCubic
                 }
             }
+            // A click on the card itself, between its controls, doesn't close it.
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.AllButtons
+            }
             Panel {
                 id: body
                 x: 14
                 y: 14
                 width: parent.width - 28
                 animate: win.settled
-                maxHeight: win.height - 30
+                maxHeight: card.room - 30
                 ctx: ctx
                 focus: true
                 onVolumeMenu: a => {
