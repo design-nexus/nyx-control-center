@@ -15,7 +15,7 @@ path = "src/main.rs"
 async-channel = "2"
 gio = "0.22"
 glib = "0.22"
-nyx-desktop = { git = "https://github.com/design-nexus/nyx-core.git", rev = "4378e243aeb09733843996663cd9a5a7f0cbb821" }
+nyx-desktop = { git = "https://github.com/design-nexus/nyx-core.git", rev = "4f05fb8fc92ec211f4e0f0b722fdf29a083c9e89" }
 nyx-plugin = { git = "https://github.com/design-nexus/nyx-core.git", rev = "4378e243aeb09733843996663cd9a5a7f0cbb821" }
 nyx-plugin-host = { git = "https://github.com/design-nexus/nyx-core.git", rev = "4378e243aeb09733843996663cd9a5a7f0cbb821" }
 nyx-plugin-protocol = { git = "https://github.com/design-nexus/nyx-core.git", rev = "4378e243aeb09733843996663cd9a5a7f0cbb821" }

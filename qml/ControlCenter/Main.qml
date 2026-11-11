@@ -95,7 +95,9 @@ Scope {
         }
     }
 
-    readonly property var targetScreen: Quickshell.screens.find(s => s.name === screenName) || null
+    // The focused monitor, or the first screen when that name isn't one (a headless or
+    // virtual output): the panel always has somewhere to show.
+    readonly property var targetScreen: Quickshell.screens.find(s => s.name === screenName) || Quickshell.screens[0] || null
 
     PanelWindow {
         id: catcher
@@ -110,8 +112,11 @@ Scope {
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.namespace: "nyx-control-center-catcher"
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+        // Only once the card is on screen: a second press while it's still appearing
+        // doesn't close it unseen.
         MouseArea {
             anchors.fill: parent
+            enabled: win.settled
             acceptedButtons: Qt.AllButtons
             onPressed: ctx.hide()
         }
@@ -155,17 +160,26 @@ Scope {
         property bool settled: false
         onVisibleChanged: {
             settled = false;
-            if (visible)
+            if (visible) {
                 settle.restart();
+                Qt.callLater(() => body.forceActiveFocus());
+            }
         }
         Timer {
             id: settle
             interval: 80
-            onTriggered: win.settled = true
+            onTriggered: {
+                win.settled = true;
+                // The backend's Toggle closes only an opening that was on screen.
+                cc.request("Shown", { serial: root.shownSerial }, null);
+            }
         }
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.namespace: "nyx-control-center"
-        WlrLayershell.keyboardFocus: root.keyboardOff ? WlrKeyboardFocus.None : WlrKeyboardFocus.OnDemand
+        // Exclusive while open, as Glimpse's: on-demand focus goes back to the last
+        // window whenever another layer closes, so the panel had the keyboard only once
+        // clicked. The catcher makes it modal anyway.
+        WlrLayershell.keyboardFocus: root.keyboardOff ? WlrKeyboardFocus.None : WlrKeyboardFocus.Exclusive
 
         Surface {
             id: card

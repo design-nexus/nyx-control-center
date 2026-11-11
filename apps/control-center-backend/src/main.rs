@@ -35,6 +35,8 @@ pub struct PanelState {
     pub open: bool,
     pub detail: Option<String>,
     pub serial: u64,
+    /// The opening the interface last said is on screen (`Shown`).
+    pub shown: u64,
 }
 
 pub struct App {
@@ -78,10 +80,24 @@ impl App {
             let p = self.panel.borrow();
             (p.open, p.detail.clone())
         };
-        if open && (detail.is_none() || current == detail) {
+        // Open but not on screen yet (the interface is still drawing it, or never
+        // could): a press shows it again rather than closing what nobody saw.
+        let seen = {
+            let p = self.panel.borrow();
+            p.shown == p.serial
+        };
+        if open && seen && (detail.is_none() || current == detail) {
             self.hide();
         } else {
             self.show(detail);
+        }
+    }
+
+    /// The interface has opening `serial` on screen.
+    pub fn shown(&self, serial: u64) {
+        let mut p = self.panel.borrow_mut();
+        if p.open && p.serial == serial {
+            p.shown = serial;
         }
     }
 

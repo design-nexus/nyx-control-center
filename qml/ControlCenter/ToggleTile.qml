@@ -12,6 +12,8 @@ TileFrame {
     property bool active: false
     property bool split: false
     property bool compact: width < 100
+    // A word under a one-cell tile's icon (the workspace mode's name).
+    property string compactLabel: ""
     property string moreTip: title + ": networks, devices and settings"
 
     signal main
@@ -26,11 +28,26 @@ TileFrame {
     readonly property color tintColor: t.ctx ? t.ctx.swatch(t.swatch) : Style.accent
     color: compact ? (active ? (hovered ? Style.mix(tintColor, Style.text, 0.12) : tintColor) : (hovered ? Style.mix(Style.card, Style.text, 0.04) : Style.card)) : on && swatch !== "" && ctx ? Style.mix(Style.card, tintColor, tintAmount) : (clickable && hovered ? Style.mix(Style.card, Style.text, 0.04) : Style.card)
     Icon {
+        id: glyph
         visible: t.compact
         anchors.centerIn: parent
+        anchors.verticalCenterOffset: t.compactLabel !== "" ? -7 : 0
         name: t.icon
         size: 22
         recolor: true
+        color: t.active ? Style.bg : Style.text
+    }
+
+    Label {
+        visible: t.compact && t.compactLabel !== ""
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: glyph.bottom
+        anchors.topMargin: 3
+        width: parent.width - 8
+        horizontalAlignment: Text.AlignHCenter
+        elide: Text.ElideRight
+        text: t.compactLabel
+        size: 10
         color: t.active ? Style.bg : Style.text
     }
 

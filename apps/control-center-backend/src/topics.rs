@@ -127,7 +127,8 @@ fn mode_json(desktop: &nyx_desktop::Desktop) -> Value {
         M::Scrolling => "scrolling",
         M::Floating => "floating",
     };
-    json!({"workspace": ws, "mode": id, "label": mode.label()})
+    let modes: Vec<&str> = nyx_desktop::omarchy::modes().iter().map(|m| m.label()).collect();
+    json!({"workspace": ws, "mode": id, "label": mode.label(), "modes": modes})
 }
 
 fn start(app: &Rc<App>, topic: &str) -> Option<Box<dyn Any>> {

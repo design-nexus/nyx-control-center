@@ -11,7 +11,7 @@ repository.workspace = true
 async-channel = "2"
 gtk = { version = "0.11", package = "gtk4", features = ["v4_18"] }
 gtk4-layer-shell = "0.8"
-nyx-desktop = { git = "https://github.com/design-nexus/nyx-core.git", rev = "4378e243aeb09733843996663cd9a5a7f0cbb821" }
+nyx-desktop = { git = "https://github.com/design-nexus/nyx-core.git", rev = "4f05fb8fc92ec211f4e0f0b722fdf29a083c9e89" }
 # The plugin system: nyx-core, and its GTK drawing in nyx-design.
 nyx-plugin = { git = "https://github.com/design-nexus/nyx-core.git", rev = "4378e243aeb09733843996663cd9a5a7f0cbb821" }
 nyx-plugin-host = { git = "https://github.com/design-nexus/nyx-core.git", rev = "4378e243aeb09733843996663cd9a5a7f0cbb821" }

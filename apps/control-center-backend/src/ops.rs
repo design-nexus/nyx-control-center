@@ -73,6 +73,10 @@ pub fn handle(app: &Rc<App>, req: Request) {
             app.toggle(opt_s(&b, "detail"));
             done(req)
         }
+        "Shown" => {
+            app.shown(b.get("serial").and_then(serde_json::Value::as_u64).unwrap_or(0));
+            done(req)
+        }
 
         // ---------- Layout ----------
         "layout.save" => {

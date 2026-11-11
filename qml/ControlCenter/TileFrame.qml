@@ -17,6 +17,13 @@ Rectangle {
     signal clicked
 
     radius: Style.radiusCard
+    // Tab reaches a tile that acts; Enter or Space acts, as a click does.
+    activeFocusOnTab: clickable
+    Keys.onReturnPressed: f.clicked()
+    Keys.onEnterPressed: f.clicked()
+    Keys.onSpacePressed: f.clicked()
+    border.width: activeFocus ? 2 : 0
+    border.color: Style.accent
     color: on && swatch !== "" && ctx ? Style.mix(Style.card, ctx.swatch(swatch), tintAmount) : (clickable && hovered ? Style.mix(Style.card, Style.text, 0.04) : Style.card)
     Behavior on color {
         ColorAnimation {
