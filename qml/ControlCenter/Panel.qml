@@ -14,10 +14,11 @@ FocusScope {
     property string detail: ""
     // Height changes animate once the panel has settled (not while it opens).
     property bool animate: true
-    // The most the panel may be (the screen's room); a detail view taller than what's
-    // left below the header scrolls, as GTK's did.
+    // The most the panel may be (the screen's room); a dashboard or detail view taller
+    // than what's left between the header and its footer scrolls, as GTK's did.
     property real maxHeight: 100000
     readonly property real roomForContent: maxHeight - 52
+    readonly property real roomForDash: roomForContent - dots.height
     property var draft: null
     readonly property var pages: draft || lay.pages || []
     readonly property var pw: power.value
@@ -37,6 +38,7 @@ FocusScope {
             draft = null;
         }
         ctx.editing = on;
+        dashFlick.contentY = 0;
         if (on)
             draft = JSON.parse(JSON.stringify(lay.pages));
         if (dash.page >= pages.length)
@@ -175,9 +177,9 @@ FocusScope {
         // ---------- Dashboard or detail ----------
         Item {
             width: parent.width
-            // A detail view is as tall as it needs (its head, what scrolls, its footer),
-            // up to the room there is.
-            height: p.detail === "" ? dash.implicitHeight : Math.min(p.roomForContent, headHost.height + detailLoader.implicitHeight + footHost.height)
+            // As tall as it needs (the dashboard and edit mode's tray; a detail view's
+            // head, what scrolls, its footer), up to the room there is.
+            height: p.detail === "" ? Math.min(p.roomForDash, dashColumn.implicitHeight) : Math.min(p.roomForContent, headHost.height + detailLoader.implicitHeight + footHost.height)
             clip: true
             Behavior on height {
                 enabled: p.animate
@@ -186,9 +188,12 @@ FocusScope {
                     easing.type: Easing.OutCubic
                 }
             }
-            Dashboard {
-                id: dash
+            // The dashboard: the header above and the dots below stay in sight; between
+            // them it scrolls.
+            Flickable {
+                id: dashFlick
                 width: parent.width
+                height: parent.height
                 x: p.detail === "" ? 0 : -width - 24
                 Behavior on x {
                     NumberAnimation {
@@ -196,18 +201,50 @@ FocusScope {
                         easing.type: Easing.OutCubic
                     }
                 }
-                ctx: p.ctx
-                pages: p.pages
-                kinds: p.lay.kinds || []
-                editing: p.ctx.editing
-                onPageChanged: p.ctx.page = page
-                onChanged: newPages => p.save(newPages)
-                onVolumeMenu: a => p.volumeMenu(a)
+                contentHeight: dashColumn.implicitHeight
+                clip: true
+                boundsBehavior: Flickable.StopAtBounds
+                flickableDirection: Flickable.VerticalFlick
+                interactive: contentHeight > height
+                Column {
+                    id: dashColumn
+                    width: parent.width
+                    Dashboard {
+                        id: dash
+                        width: parent.width
+                        ctx: p.ctx
+                        scroller: dashFlick
+                        pages: p.pages
+                        kinds: p.lay.kinds || []
+                        editing: p.ctx.editing
+                        onPageChanged: p.ctx.page = page
+                        onChanged: newPages => p.save(newPages)
+                        onVolumeMenu: a => p.volumeMenu(a)
+                    }
+                    // ---------- Tray (edit mode) ----------
+                    Tray {
+                        width: parent.width
+                        visible: p.ctx.editing && p.detail === ""
+                        ctx: p.ctx
+                        pages: p.pages
+                        kinds: p.lay.kinds || []
+                        plugins: p.plugins
+                        onAdd: (id, size) => {
+                            const copy = JSON.parse(JSON.stringify(p.pages));
+                            const pg = Math.min(dash.page, copy.length - 1);
+                            copy[pg].tiles.push({ widget: id, size: size });
+                            p.save(copy);
+                        }
+                    }
+                }
             }
             Timer {
                 id: scrollTest
                 interval: 1500
-                onTriggered: detailFlick.contentY = Math.max(0, detailFlick.contentHeight - detailFlick.height)
+                onTriggered: {
+                    detailFlick.contentY = Math.max(0, detailFlick.contentHeight - detailFlick.height);
+                    dashFlick.contentY = Math.max(0, dashFlick.contentHeight - dashFlick.height);
+                }
             }
             // The detail view: its head and footer stay in sight; between them it scrolls.
             Item {
@@ -274,7 +311,8 @@ FocusScope {
                                     c.y = 0;
                                 }
                             }
-                            // Screenshot hook: NYX_CC_TEST_SCROLL scrolls a detail view to its end.
+                            // Screenshot hook: NYX_CC_TEST_SCROLL scrolls the dashboard or a
+                            // detail view to its end.
                             if (Quickshell.env("NYX_CC_TEST_SCROLL"))
                                 scrollTest.restart();
                         }
@@ -285,6 +323,7 @@ FocusScope {
 
         // ---------- Dots ----------
         Item {
+            id: dots
             width: parent.width
             visible: p.detail === "" && (p.pages.length > 1 || p.ctx.editing)
             height: visible ? 18 : 0
@@ -343,21 +382,29 @@ FocusScope {
                 }
             }
         }
+    }
 
-        // ---------- Tray (edit mode) ----------
-        Tray {
-            width: parent.width
-            visible: p.ctx.editing && p.detail === ""
-            ctx: p.ctx
-            pages: p.pages
-            kinds: p.lay.kinds || []
-            plugins: p.plugins
-            onAdd: (id, size) => {
-                const copy = JSON.parse(JSON.stringify(p.pages));
-                const pg = Math.min(dash.page, copy.length - 1);
-                copy[pg].tiles.push({ widget: id, size: size });
-                p.save(copy);
-            }
+    // Tabbing to something scrolled out of sight scrolls it into view.
+    function reveal(flick, item) {
+        if (!item || !flick.interactive || item.focusReason === Qt.MouseFocusReason)
+            return;
+        let a = item;
+        while (a && a !== flick.contentItem)
+            a = a.parent;
+        if (!a)
+            return;
+        const y = item.mapToItem(flick.contentItem, 0, 0).y;
+        if (y < flick.contentY)
+            flick.contentY = Math.max(0, y - 8);
+        else if (y + item.height > flick.contentY + flick.height)
+            flick.contentY = Math.min(flick.contentHeight - flick.height, y + item.height - flick.height + 8);
+    }
+    Connections {
+        target: p.Window.window
+        function onActiveFocusItemChanged() {
+            const item = p.Window.activeFocusItem;
+            p.reveal(dashFlick, item);
+            p.reveal(detailFlick, item);
         }
     }
 
@@ -370,7 +417,10 @@ FocusScope {
     function reset(remember, detailWanted) {
         if (!remember)
             dash.page = 0;
+        dashFlick.contentY = 0;
         detail = detailWanted || "";
+        if (Quickshell.env("NYX_CC_TEST_SCROLL"))
+            scrollTest.restart();
         if (ctx.editing)
             setEditing(false);
     }

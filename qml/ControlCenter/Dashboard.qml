@@ -13,6 +13,8 @@ Item {
     property var kinds: []
     property int page: 0
     property bool editing: false
+    // The panel's scrolling view, which up-and-down scrolling over the tiles moves.
+    property Flickable scroller: null
     readonly property real cellW: (width - 3 * gap) / 4
     // The tiles on screen, for the rows' height.
     property var views: []
@@ -193,6 +195,8 @@ Item {
                             id: drag
                             anchors.fill: parent
                             visible: d.editing
+                            // A drag moves the tile, not the scrolling panel around it.
+                            preventStealing: true
                             property bool active: drag.drag.active
                             drag.target: cell
                             cursorShape: drag.drag.active ? Qt.ClosedHandCursor : Qt.OpenHandCursor
@@ -274,12 +278,21 @@ Item {
         }
     }
 
-    // Sideways scrolling (a touchpad swipe) changes page past 40 px.
+    // Sideways scrolling (a touchpad swipe) changes page past 40 px. Up and down scrolls
+    // the panel (this handler takes every wheel event over the tiles).
     WheelHandler {
-        orientation: Qt.Horizontal
+        target: null
         property real acc: 0
         onWheel: e => {
-            acc += e.pixelDelta.x !== 0 ? e.pixelDelta.x : e.angleDelta.x / 3;
+            const dx = e.pixelDelta.x !== 0 ? e.pixelDelta.x : e.angleDelta.x / 3;
+            const dy = e.pixelDelta.y !== 0 ? e.pixelDelta.y : e.angleDelta.y / 120 * 48;
+            if (Math.abs(dy) > Math.abs(dx)) {
+                const f = d.scroller;
+                if (f && f.interactive)
+                    f.contentY = Math.max(0, Math.min(f.contentHeight - f.height, f.contentY - dy));
+                return;
+            }
+            acc += dx;
             if (Math.abs(acc) > 40) {
                 const next = d.page + (acc < 0 ? 1 : -1);
                 if (next >= 0 && next < d.pages.length)
