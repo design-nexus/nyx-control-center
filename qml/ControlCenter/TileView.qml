@@ -55,7 +55,7 @@ Loader {
         id: keepAwake
         SimpleToggle {
             ctx: v.ctx; cols: v.cols; tile: v.tile
-            field: "keep_awake"; op: "omarchy.toggle_keep_awake"; swatch: "amber"; icon: "preferences-desktop-screensaver-symbolic"; title: "Keep awake"; onStatus: "Screen stays on"
+            field: "keep_awake"; op: "omarchy.toggle_keep_awake"; swatch: "amber"; icon: Qt.resolvedUrl("icons/coffee.svg"); title: "Keep awake"; onStatus: "Screen stays on"
             tips: ["Keep awake is on: the screen won't dim, lock or sleep. Click to turn it off", "Keep awake: click to stop the screen dimming, locking or sleeping"]
         }
     }

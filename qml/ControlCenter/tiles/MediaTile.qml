@@ -126,13 +126,14 @@ TileFrame {
             height: 40
             radius: 20
             anchors.verticalCenter: parent.verticalCenter
-            color: playArea.containsMouse ? Style.alpha(Style.text, 0.16) : Style.alpha(Style.text, 0.1)
+            opacity: t.nothing ? 0.45 : 1
+            color: playArea.containsMouse ? Style.mix(Style.text, Style.bg, 0.12) : Style.text
             Icon {
                 anchors.centerIn: parent
                 name: t.st.playing ? "media-playback-pause-symbolic" : "media-playback-start-symbolic"
                 size: 18
                 recolor: true
-                color: Style.text
+                color: Style.bg
             }
             MouseArea {
                 id: playArea

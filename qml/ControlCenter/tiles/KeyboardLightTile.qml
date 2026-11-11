@@ -18,7 +18,7 @@ ToggleTile {
     icon: "keyboard-brightness-symbolic"
     title: "Key light"
     active: k !== null && k.value > 0
-    status: active ? Math.round(k.value * 100) + "%" : "Off"
+    status: active ? "Level " + step + " of " + max : "Off"
     tooltip: active ? "Keyboard light at level " + step + " of " + max + ". Click for the next level" : "Keyboard light is off. Click to turn it on"
     onMain: {
         if (!k)
@@ -27,22 +27,22 @@ ToggleTile {
         ctx.call("brightness.set", { device: k.device, value: next / max });
     }
 
-    // A bar per level, stacked upward, lit to the current one.
+    // A bar per level, stacked upward, lit to the current one: in the text colour, which
+    // reads on the plain card and the tinted one alike.
     Column {
-        visible: t.compact
+        visible: t.compact && t.max > 0
         anchors.right: parent.right
-        anchors.rightMargin: 8
+        anchors.rightMargin: 9
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 5
+        spacing: 4
         Repeater {
             model: Math.min(5, t.max)
             Rectangle {
                 required property int index
-                width: 6
-                height: 2
-                radius: 1
-                // On the lit tile, in its ink; on the plain one, in the swatch.
-                color: (Math.min(5, t.max) - index) <= t.step ? (t.active ? Style.alpha(Style.bg, 0.85) : t.ctx.swatch("teal")) : (t.active ? Style.alpha(Style.bg, 0.3) : Style.alpha(Style.text, 0.18))
+                width: 12
+                height: 4
+                radius: 2
+                color: (Math.min(5, t.max) - index) <= t.step ? Style.text : Style.alpha(Style.text, 0.2)
             }
         }
     }

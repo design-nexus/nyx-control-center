@@ -202,7 +202,7 @@ Column {
     }
     CardBox {
         Repeater {
-            model: [["power-saver", "power-profile-power-saver-symbolic", "Power saver", "Longer battery life, slower"], ["balanced", "power-profile-balanced-symbolic", "Balanced", "The everyday setting"], ["performance", "power-profile-performance-symbolic", "Performance", "Fastest; more power, more heat"]].filter(p => v.st.profiles.length === 0 || v.st.profiles.indexOf(p[0]) >= 0)
+            model: [["power-saver", Qt.resolvedUrl("../icons/leaf.svg"), "Power saver", "Longer battery life, slower"], ["balanced", Qt.resolvedUrl("../icons/gauge.svg"), "Balanced", "The everyday setting"], ["performance", Qt.resolvedUrl("../icons/bolt.svg"), "Performance", "Fastest; more power, more heat"]].filter(p => v.st.profiles.length === 0 || v.st.profiles.indexOf(p[0]) >= 0)
             delegate: CcRow {
                 required property var modelData
                 icon: modelData[1]

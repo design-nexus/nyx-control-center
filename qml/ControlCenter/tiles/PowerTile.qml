@@ -3,42 +3,62 @@ import Nyx.Shell
 import Nyx.Ui
 import ".."
 
-// Power mode: a segmented control of its three icons.
+// Power mode: its name over a segmented row of the three modes (leaf, gauge, bolt, the
+// suite's own drawings so they never look alike), the chosen one filled in its swatch.
 TileFrame {
     id: t
     property int cols: 2
     property var tile
     readonly property var st: pw.value || ({ profiles: [], profile: null })
-    // Its buttons are as tall as a row, inside 5 px: as in GTK, this sets the row height.
-    readonly property real need: 58
+    readonly property var modes: [["power-saver", "icons/leaf.svg", "green", "Power saver: longer battery life, slower"], ["balanced", "icons/gauge.svg", "blue", "Balanced: the everyday setting"], ["performance", "icons/bolt.svg", "coral", "Performance: fastest, uses more power and runs warmer"]].filter(p => t.st.profiles.length === 0 || t.st.profiles.indexOf(p[0]) >= 0)
+    // The name and the row, as tall as a one-cell tile.
+    readonly property real need: 64
     BackendTopic { id: pw; client: t.ctx.client; name: "power"; active: !!(t.ctx && t.ctx.open && t.visible) }
 
+    Label {
+        id: name
+        x: 12
+        anchors.bottom: track.top
+        anchors.bottomMargin: 6
+        text: "Power mode"
+        size: 12.5
+        font.weight: Font.Medium
+    }
+
     Rectangle {
-        anchors.fill: parent
-        anchors.margins: 5
-        radius: Style.radiusSmall
-        color: Style.alpha(Style.text, 0.035)
+        id: track
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.margins: 9
+        height: 28
+        radius: 8
+        color: Style.alpha(Style.text, 0.06)
         Row {
             anchors.fill: parent
             anchors.margins: 2
             spacing: 2
             Repeater {
-                model: [["power-saver", "power-profile-power-saver-symbolic", "green", "Power saver: longer battery life, slower"], ["balanced", "power-profile-balanced-symbolic", "blue", "Balanced: the everyday setting"], ["performance", "power-profile-performance-symbolic", "coral", "Performance: fastest, uses more power and runs warmer"]].filter(p => t.st.profiles.length === 0 || t.st.profiles.indexOf(p[0]) >= 0)
+                model: t.modes
                 delegate: Rectangle {
                     id: seg
                     required property var modelData
-                    required property int index
                     readonly property bool sel: t.st.profile === modelData[0]
-                    width: (parent.width - 2 * (t.st.profiles.length > 0 ? t.st.profiles.length - 1 : 2)) / Math.max(1, t.st.profiles.length || 3)
+                    width: (parent.width - (t.modes.length - 1) * 2) / Math.max(1, t.modes.length)
                     height: parent.height
-                    radius: 5
-                    color: sel ? Style.raised : area.containsMouse ? Style.alpha(Style.text, 0.05) : "transparent"
+                    radius: 6
+                    color: sel ? t.ctx.swatch(modelData[2]) : area.containsMouse ? Style.alpha(Style.text, 0.06) : "transparent"
+                    Behavior on color {
+                        ColorAnimation {
+                            duration: Style.fast
+                        }
+                    }
                     Icon {
                         anchors.centerIn: parent
-                        name: seg.modelData[1]
-                        size: 18
+                        name: Qt.resolvedUrl("../" + seg.modelData[1])
+                        size: 15
                         recolor: true
-                        color: seg.sel ? t.ctx.swatch(seg.modelData[2]) : Style.dimText
+                        color: seg.sel ? Style.onAccent : area.containsMouse ? Style.text : Style.dimText
                     }
                     MouseArea {
                         id: area

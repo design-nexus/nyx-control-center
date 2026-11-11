@@ -13,7 +13,7 @@ ToggleTile {
     swatch: "violet"
     split: cols >= 2
     title: "Tailscale"
-    icon: "network-vpn-symbolic"
+    icon: "network-workgroup-symbolic"
     active: !!st.running
     enabled: st.installed !== false
     opacity: enabled ? 1 : 0.5

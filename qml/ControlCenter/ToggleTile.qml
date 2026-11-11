@@ -15,6 +15,10 @@ TileFrame {
     // The word under a one-cell tile's icon in place of its name (the workspace mode's).
     property string compactLabel: ""
     property string moreTip: title + ": networks, devices and settings"
+    // The icon's colour while off (Battery's green or red).
+    property color iconInk: Style.text
+    // A chevron at the right of a wide tile that isn't split: the whole tile opens a page.
+    property bool chevron: false
     // A one-cell tile's icon and name need this much height.
     readonly property real need: compact ? 66 : 0
 
@@ -34,12 +38,10 @@ TileFrame {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         anchors.topMargin: Math.max(6, (parent.height - height - name.implicitHeight - 5) / 2)
-        width: 32
-        height: 32
         icon: t.icon
-        iconSize: 17
         on: t.active
         tint: t.tintColor
+        ink: t.iconInk
     }
 
     Label {
@@ -66,13 +68,14 @@ TileFrame {
         icon: t.icon
         on: t.active
         tint: t.tintColor
+        ink: t.iconInk
     }
 
     Column {
         visible: !t.compact
         anchors.left: chip.right
-        anchors.leftMargin: t.split ? 8 : 10
-        anchors.right: t.split ? more.left : parent.right
+        anchors.leftMargin: 10
+        anchors.right: t.split ? more.left : chev.visible ? chev.left : parent.right
         anchors.rightMargin: 6
         anchors.verticalCenter: parent.verticalCenter
         Label {
@@ -88,6 +91,18 @@ TileFrame {
             size: 11.5
             dim: true
         }
+    }
+
+    Icon {
+        id: chev
+        visible: t.chevron && !t.split && !t.compact
+        anchors.right: parent.right
+        anchors.rightMargin: 9
+        anchors.verticalCenter: parent.verticalCenter
+        name: "pan-end-symbolic"
+        size: 14
+        recolor: true
+        color: t.hovered ? Style.text : Style.dimText
     }
 
     // The main part of a split tile.

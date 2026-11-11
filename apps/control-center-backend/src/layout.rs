@@ -113,7 +113,7 @@ pub const KINDS: &[(&str, &str, &str, &[&str])] = &[
     ("wifi", "Wi-Fi", "network-wireless-symbolic", &["2x1", "1x1"]),
     ("bluetooth", "Bluetooth", "bluetooth-symbolic", &["2x1", "1x1"]),
     ("devices", "Devices", "phone-symbolic", &["2x1", "1x1"]),
-    ("tailscale", "Tailscale", "network-vpn-symbolic", &["2x1", "1x1"]),
+    ("tailscale", "Tailscale", "network-workgroup-symbolic", &["2x1", "1x1"]),
     ("vpn", "VPN", "security-high-symbolic", &["2x1", "1x1"]),
     ("dnd", "Do not disturb", "notifications-disabled-symbolic", &["1x1"]),
     ("mode", "Workspace mode", "view-grid-symbolic", &["1x1"]),

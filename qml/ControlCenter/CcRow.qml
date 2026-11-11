@@ -37,22 +37,17 @@ Rectangle {
         cursorShape: r.clickable ? Qt.PointingHandCursor : Qt.ArrowCursor
         onClicked: r.clicked()
     }
-    Rectangle {
+    Chip {
         id: disc
         visible: r.icon !== ""
         x: 6
         anchors.verticalCenter: parent.verticalCenter
-        width: 26
-        height: 26
-        radius: 13
-        color: r.selected ? Style.accent : Style.alpha(Style.text, 0.08)
-        Icon {
-            anchors.centerIn: parent
-            name: r.icon
-            size: 14
-            recolor: true
-            color: r.selected ? Style.onAccent : Style.dimText
-        }
+        implicitWidth: 28
+        implicitHeight: 28
+        iconSize: 15
+        icon: r.icon
+        on: r.selected
+        ink: Style.dimText
     }
     Column {
         id: texts
