@@ -22,6 +22,9 @@ Rectangle {
     Keys.onReturnPressed: f.clicked()
     Keys.onEnterPressed: f.clicked()
     Keys.onSpacePressed: f.clicked()
+    Accessible.role: Accessible.Button
+    Accessible.name: f.tooltip
+    Accessible.onPressAction: f.clicked()
     border.width: activeFocus ? 2 : 0
     border.color: Style.accent
     color: on && swatch !== "" && ctx ? Style.mix(Style.card, ctx.swatch(swatch), tintAmount) : (clickable && hovered ? Style.mix(Style.card, Style.text, 0.04) : Style.card)

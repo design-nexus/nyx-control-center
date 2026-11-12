@@ -28,6 +28,18 @@ TileFrame {
     clickable: !split || compact
     on: active && (compact || split)
     onClicked: t.main()
+    // A wide split tile isn't one button, but Tab still reaches it: Enter acts, Right or
+    // the Menu key opens its detail view.
+    activeFocusOnTab: true
+    Keys.onPressed: e => {
+        if (t.split && !t.compact && (e.key === Qt.Key_Right || e.key === Qt.Key_Menu)) {
+            t.more();
+            e.accepted = true;
+        }
+    }
+    Accessible.name: t.status !== "" ? t.title + ", " + t.status : t.title
+    Accessible.checkable: true
+    Accessible.checked: t.active
 
     readonly property color tintColor: t.ctx ? t.ctx.swatch(t.swatch) : Style.accent
     color: on && swatch !== "" && ctx ? Style.mix(Style.card, tintColor, hovered && clickable ? tintAmount + 0.05 : tintAmount) : (clickable && hovered ? Style.mix(Style.card, Style.text, 0.04) : Style.card)

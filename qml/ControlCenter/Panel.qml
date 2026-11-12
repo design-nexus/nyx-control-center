@@ -27,6 +27,19 @@ FocusScope {
     signal volumeMenu(var anchor)
     signal powerMenu(var anchor)
 
+    // Page Up and Page Down turn the dashboard's pages, as a swipe does.
+    Keys.onPressed: e => {
+        if (p.detail !== "" || p.pages.length < 2)
+            return;
+        if (e.key === Qt.Key_PageDown && dash.page < p.pages.length - 1) {
+            dash.page += 1;
+            e.accepted = true;
+        } else if (e.key === Qt.Key_PageUp && dash.page > 0) {
+            dash.page -= 1;
+            e.accepted = true;
+        }
+    }
+
     function back() {
         detail = "";
     }
@@ -341,6 +354,18 @@ FocusScope {
                         height: 6
                         radius: 3
                         color: on ? Style.dimText : Style.alpha(Style.text, 0.1)
+                        activeFocusOnTab: true
+                        Accessible.role: Accessible.PageTab
+                        Accessible.name: "Page " + (index + 1) + " of " + p.pages.length
+                        Accessible.selected: on
+                        Accessible.onPressAction: dash.page = index
+                        Keys.onPressed: e => {
+                            if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter || e.key === Qt.Key_Space) {
+                                dash.page = index;
+                                e.accepted = true;
+                            }
+                        }
+                        FocusRing {}
                         Behavior on width {
                             NumberAnimation {
                                 duration: Style.panelDuration
