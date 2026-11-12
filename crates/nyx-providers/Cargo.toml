@@ -13,7 +13,7 @@ gio = "0.22"
 glib = "0.22"
 nyx-widgets = { path = "../nyx-widgets" }
 # Phones paired through Flux (Nyx Connect).
-nyx-connect = { git = "https://github.com/design-nexus/nyx-core.git", rev = "166ff17bdb09dd6c5f130fd28ecf81d1f8a59d2d" }
+nyx-connect = { git = "https://github.com/design-nexus/nyx-core.git", rev = "32f0c5e154fc44c763b8ecd80d35a3b298723afa" }
 rusqlite = { version = "0.40", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
