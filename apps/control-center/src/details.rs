@@ -562,11 +562,21 @@ fn devices_view(back: Rc<dyn Fn()>) -> gtk::Widget {
     bind(&root, devices::live(), move |st| {
         clear(&b);
         if !st.available {
-            let l = label(if st.installed { "Flux isn't running" } else { "Flux isn't installed" }, "cc-empty");
+            let pair = st.installed && st.pair_first;
+            let l = label(
+                if pair {
+                    "No phone is paired"
+                } else if st.installed {
+                    "Flux isn't running"
+                } else {
+                    "Flux isn't installed"
+                },
+                "cc-empty",
+            );
             l.set_xalign(0.5);
             b.append(&l);
             if st.installed {
-                let start = gtk::Button::with_label("Start Flux");
+                let start = gtk::Button::with_label(if pair { "Pair a phone" } else { "Start Flux" });
                 start.set_halign(gtk::Align::Center);
                 start.connect_clicked(|_| act(devices::start_flux()));
                 b.append(&start);

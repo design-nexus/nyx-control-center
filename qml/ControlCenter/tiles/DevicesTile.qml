@@ -24,8 +24,8 @@ ToggleTile {
     active: connected.length > 0
     enabled: st.installed !== false
     opacity: enabled ? 1 : 0.5
-    status: !st.installed ? "Not installed" : !st.available ? "Flux isn't running" : pairing.length > 0 ? pairing[0] + " wants to pair" : connected.length === 0 ? ((st.devices || []).length === 0 ? "None paired" : "None connected") : connected.length === 1 ? connected[0].name + battery(connected[0]) : connected.length + " connected"
-    tooltip: !st.installed ? "Flux isn't installed" : !st.available ? "Flux isn't running. Click to start it" : connected.length === 0 ? "No device is connected. Click for your devices" : "Connected: " + connected.map(d => d.name).join(", ") + ". Click for your devices"
+    status: !st.installed ? "Not installed" : !st.available && st.pair_first ? "None paired" : !st.available ? "Flux isn't running" : pairing.length > 0 ? pairing[0] + " wants to pair" : connected.length === 0 ? ((st.devices || []).length === 0 ? "None paired" : "None connected") : connected.length === 1 ? connected[0].name + battery(connected[0]) : connected.length + " connected"
+    tooltip: !st.installed ? "Flux isn't installed" : !st.available && st.pair_first ? "No phone is paired. Click to pair one in Settings" : !st.available ? "Flux isn't running. Click to start it" : connected.length === 0 ? "No device is connected. Click for your devices" : "Connected: " + connected.map(d => d.name).join(", ") + ". Click for your devices"
     onMain: st.installed && !st.available ? ctx.call("devices.start", {}) : ctx.openDetail("devices")
     onMore: ctx.openDetail("devices")
 }

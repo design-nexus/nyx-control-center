@@ -26,6 +26,8 @@ pub struct State {
     pub installed: bool,
     /// fluxd answers.
     pub available: bool,
+    /// fluxd waits for a phone to be paired in Settings before it starts (NyxOS).
+    pub pair_first: bool,
     /// Paired devices, connected first.
     pub devices: Vec<Device>,
     /// Devices asking to pair, or waiting for this computer's confirmation.
@@ -39,11 +41,16 @@ impl State {
 }
 
 thread_local! {
-    static LIVE: Live<State> = Live::new(State { installed: installed(), ..State::default() }, start);
+    static LIVE: Live<State> = Live::new(away(), start);
 }
 
 pub fn live() -> Live<State> {
     LIVE.with(|l| l.clone())
+}
+
+/// While fluxd doesn't answer.
+fn away() -> State {
+    State { installed: installed(), pair_first: waits_for_pairing(), ..State::default() }
 }
 
 fn installed() -> bool {
@@ -59,7 +66,7 @@ fn start(set: Setter<State>) -> Box<dyn Stop> {
         while let Ok(event) = rx.recv().await {
             match event {
                 Event::State(s) => set.set(read(&s)),
-                Event::Unavailable(_) => set.set(State { installed: installed(), ..State::default() }),
+                Event::Unavailable(_) => set.set(away()),
                 Event::Toast(_) => {}
             }
         }
@@ -84,7 +91,7 @@ pub fn read(s: &Snapshot) -> State {
     devices.sort_by(|a, b| b.connected.cmp(&a.connected).then(a.name.to_lowercase().cmp(&b.name.to_lowercase())));
     let pairing =
         s.devices.iter().filter(|d| matches!(d.pair_state.as_str(), "incoming" | "confirm")).map(|d| d.name.clone()).collect();
-    State { installed: true, available: true, devices, pairing }
+    State { installed: true, available: true, pair_first: false, devices, pairing }
 }
 
 async fn blocking(work: impl FnOnce(&Client) -> Result<(), nyx_connect::Error> + Send + 'static) -> Result<(), String> {
@@ -105,8 +112,21 @@ pub async fn send_clipboard(id: &str) -> Result<(), String> {
     blocking(move |c| c.send_clipboard(&id, "")).await
 }
 
-/// Start fluxd's user service.
+/// Whether fluxd waits for a phone to be paired before it starts (NyxOS) and none is yet.
+pub fn waits_for_pairing() -> bool {
+    std::path::Path::new("/etc/NIXOS").exists() && !glib::user_data_dir().join("flux/devices.json").exists()
+}
+
+/// Start fluxd's user service, or open Settings › Devices to pair a phone when fluxd
+/// waits for one.
 pub async fn start_flux() -> Result<(), String> {
+    if waits_for_pairing() {
+        return std::process::Command::new("nyx-settings")
+            .args(["--section", "devices"])
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| format!("Couldn't open Settings: {e}"));
+    }
     crate::run(&["systemctl", "--user", "start", "fluxd.service"], None).await
 }
 

@@ -39,13 +39,13 @@ Column {
         horizontalAlignment: Text.AlignHCenter
         topPadding: 32
         bottomPadding: 8
-        text: v.st.installed ? "Flux isn't running" : "Flux isn't installed"
+        text: v.st.installed && v.st.pair_first ? "No phone is paired" : v.st.installed ? "Flux isn't running" : "Flux isn't installed"
         dim: true
     }
     Button {
         visible: !!v.st.installed && !v.st.available
         anchors.horizontalCenter: parent.horizontalCenter
-        text: "Start Flux"
+        text: v.st.pair_first ? "Pair a phone" : "Start Flux"
         onClicked: v.ctx.call("devices.start", {})
     }
     Column {
