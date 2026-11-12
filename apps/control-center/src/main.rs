@@ -51,7 +51,13 @@ fn quickshell(args: &[String]) -> Option<std::process::ExitCode> {
     if args.iter().any(|a| a == "--only") {
         return None;
     }
-    let (op, body) = if let Some(i) = args.iter().position(|a| a == "--toggle") {
+    let (op, body) = if args.iter().any(|a| a == "--refresh") {
+        if args.iter().skip_while(|a| *a != "--refresh").nth(1).map(String::as_str) != Some("brightness") {
+            eprintln!("nyx-control-center: --refresh takes brightness");
+            return Some(std::process::ExitCode::from(2));
+        }
+        ("brightness.refresh", serde_json::json!({}))
+    } else if let Some(i) = args.iter().position(|a| a == "--toggle") {
         ("Toggle", serde_json::json!({"detail": args.get(i + 1).filter(|a| !a.starts_with("--"))}))
     } else if args.iter().any(|a| a == "--show") {
         ("Show", serde_json::json!({}))
@@ -94,12 +100,13 @@ fn main() -> std::process::ExitCode {
         let args: Vec<String> = cmd.arguments().iter().skip(1).map(|a| a.to_string_lossy().to_string()).collect();
         if args.iter().any(|a| a == "-h" || a == "--help") {
             println!(
-                "Usage: nyx-control-center [--toggle [PAGE] | --show | --hide] [--only <output>]\n       nyx-control-center --ui [qml|gtk]\n\n\
+                "Usage: nyx-control-center [--toggle [PAGE] | --show | --hide] [--only <output>]\n       nyx-control-center --ui [qml|gtk]\n       nyx-control-center --refresh brightness\n\n\
                  With no option, start (hidden). The options open or close the running one;\n\
                  --toggle with a page's name opens it on that page: wifi, bluetooth, vpn,\n\
                  tailscale, devices, display, battery, or sound (the Quickshell interface).\n\
                  --ui switches between the GTK interface and the Quickshell one (or says\n\
-                 which is on)."
+                 which is on). --refresh brightness reads the brightness again (after the\n\
+                 brightness keys), so the OSD shows it."
             );
             return glib::ExitCode::SUCCESS;
         }

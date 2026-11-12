@@ -52,6 +52,10 @@ impl App {
     pub fn publish_panel(&self) {
         let p = self.panel.borrow();
         self.link.publish("panel", json!({"open": p.open, "detail": p.detail, "serial": p.serial}));
+        nyx_providers::brightness::set_polling(p.open);
+        if p.open {
+            nyx_providers::brightness::refresh(nyx_providers::brightness::live().setter());
+        }
     }
 
     pub fn show(&self, detail: Option<String>) {

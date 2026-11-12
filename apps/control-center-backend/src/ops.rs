@@ -207,6 +207,10 @@ pub fn handle(app: &Rc<App>, req: Request) {
 
         // ---------- Brightness, screens ----------
         // Read back at once, not at the next poll, so the OSD and the sliders follow.
+        "brightness.refresh" => {
+            brightness::refresh(brightness::live().setter());
+            done(req)
+        }
         "brightness.set_screen" => act(req, async move {
             let r = brightness::set_screen(f(&b, "value")).await;
             brightness::refresh(brightness::live().setter());

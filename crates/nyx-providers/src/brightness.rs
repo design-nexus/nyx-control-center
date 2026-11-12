@@ -28,6 +28,14 @@ pub struct State {
 
 thread_local! {
     static LIVE: Live<State> = Live::new(State::default(), start);
+    static POLL: std::cell::Cell<bool> = const { std::cell::Cell::new(true) };
+}
+
+/// Whether a subscription reads every 2 seconds. The Control Center's backend turns it
+/// off while its panel is closed: the OSD stays subscribed, and the brightness keys ask
+/// for one reading (`nyx-control-center --refresh brightness`).
+pub fn set_polling(on: bool) {
+    POLL.with(|p| p.set(on));
 }
 
 pub fn live() -> Live<State> {
@@ -37,7 +45,9 @@ pub fn live() -> Live<State> {
 fn start(set: Setter<State>) -> Box<dyn Stop> {
     refresh(set.clone());
     let id = glib::timeout_add_local(Duration::from_secs(2), move || {
-        refresh(set.clone());
+        if POLL.with(std::cell::Cell::get) {
+            refresh(set.clone());
+        }
         glib::ControlFlow::Continue
     });
     Box::new(TimerStop(Some(id)))
