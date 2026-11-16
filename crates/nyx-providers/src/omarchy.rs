@@ -179,7 +179,12 @@ pub async fn toggle_night_light() -> Result<(), String> {
         return toggle("omarchy-toggle-nightlight").await;
     }
     let r = if live().get().night_light {
-        run(&["hyprctl", "hyprsunset", "identity"], None).await
+        // `identity` alone leaves the reported temperature where it was, which still reads
+        // as on: 6500 K first, then identity for an exact neutral picture.
+        match run(&["hyprctl", "hyprsunset", "temperature", "6500"], None).await {
+            Ok(_) => run(&["hyprctl", "hyprsunset", "identity"], None).await,
+            Err(e) => Err(e),
+        }
     } else {
         // hyprsunset answers hyprctl once it runs; start it the first time.
         if output(&["hyprctl", "hyprsunset", "temperature"]).await.is_none_or(|r| r.trim().parse::<u32>().is_err()) {
