@@ -4,8 +4,8 @@
 
 use crate::App;
 use nyx_providers::{
-    audio, backup, bluetooth, brightness, calendar, devices, display, dns, home, media, network, omarchy, power, routes,
-    tailscale, vpn,
+    audio, backup, bluetooth, brightness, calendar, devices, display, dns, home, media, network, power, routes, tailscale,
+    toggles, vpn,
 };
 use nyx_widgets::live::{Live, Subscription};
 use serde::Serialize;
@@ -153,7 +153,8 @@ fn start(app: &Rc<App>, topic: &str) -> Option<Box<dyn Any>> {
         "power-history" => bind(app, "power-history", power::history(), plain),
         "calendar" => bind(app, "calendar", calendar::live(), calendar_json),
         "home" => bind(app, "home", home::live(), plain),
-        "omarchy" => bind(app, "omarchy", omarchy::live(), plain),
+        "toggles" => bind(app, "toggles", toggles::live(), plain),
+        "omarchy" => bind(app, "omarchy", toggles::live(), plain),
         "routes" => bind(app, "routes", routes::live(), |st: &routes::State| {
             let mut v = plain(st);
             v["route"] = json!(format!("{:?}", st.route()).to_lowercase());

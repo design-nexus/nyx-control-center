@@ -39,7 +39,7 @@ Loader {
         id: dnd
         SimpleToggle {
             ctx: v.ctx; cols: v.cols; tile: v.tile
-            field: "dnd"; op: "omarchy.toggle_dnd"; swatch: "violet"; icon: "notifications-disabled-symbolic"; title: "Do not disturb"
+            field: "dnd"; op: "toggles.dnd"; swatch: "violet"; icon: "notifications-disabled-symbolic"; title: "Do not disturb"
             tips: ["Do not disturb is on: pop-ups stay quiet. Click to allow them", "Do not disturb: click to silence pop-ups (they still reach the Notification Center)"]
         }
     }
@@ -47,7 +47,7 @@ Loader {
         id: nightLight
         SimpleToggle {
             ctx: v.ctx; cols: v.cols; tile: v.tile
-            field: "night_light"; op: "omarchy.toggle_night_light"; swatch: "coral"; icon: "night-light-symbolic"; title: "Night light"
+            field: "night_light"; op: "toggles.night_light"; swatch: "coral"; icon: "night-light-symbolic"; title: "Night light"
             tips: ["Night light is on: warmer screen colours. Click to turn it off", "Night light: click for warmer screen colours"]
         }
     }
@@ -55,7 +55,7 @@ Loader {
         id: keepAwake
         SimpleToggle {
             ctx: v.ctx; cols: v.cols; tile: v.tile
-            field: "keep_awake"; op: "omarchy.toggle_keep_awake"; swatch: "amber"; icon: Qt.resolvedUrl("icons/coffee.svg"); title: "Keep awake"; onStatus: "Screen stays on"
+            field: "keep_awake"; op: "toggles.keep_awake"; swatch: "amber"; icon: Qt.resolvedUrl("icons/coffee.svg"); title: "Keep awake"; onStatus: "Screen stays on"
             tips: ["Keep awake is on: the screen won't dim, lock or sleep. Click to turn it off", "Keep awake: click to stop the screen dimming, locking or sleeping"]
         }
     }

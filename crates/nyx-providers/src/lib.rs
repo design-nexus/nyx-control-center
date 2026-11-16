@@ -11,7 +11,7 @@
 //! | [`brightness`] | `brightnessctl` | read while shown, every 2 s |
 //! | [`home`] | Nyx Home's service (`Home.Devices1`) | read every 3 s while shown |
 //! | [`media`] | MPRIS players (D-Bus) | D-Bus signals |
-//! | [`omarchy`] | Omarchy's toggles and state files | file monitors |
+//! | [`toggles`] | Do Not Disturb, keep awake, night light (Omarchy's or Nyx's) | file monitors |
 //! | [`tailscale`] | `tailscale status --json` | read every 5 s while shown |
 //! | [`routes`] | NordVPN and Tor (`nordvpn`, `tormarchy`) | read every 4 s while shown |
 //! | [`dns`] | Omarchy's DNS provider (`omarchy-dns`) | read when shown |
@@ -27,7 +27,13 @@ pub mod dns;
 pub mod home;
 pub mod media;
 pub mod network;
-pub mod omarchy;
+/// Do Not Disturb, keep awake and night light: Omarchy's switches where it's installed,
+/// Nyx's own services elsewhere.
+pub mod toggles;
+/// Whether this is Omarchy (its commands are installed).
+pub mod omarchy {
+    pub use crate::toggles::here;
+}
 pub mod power;
 pub mod routes;
 pub mod tailscale;

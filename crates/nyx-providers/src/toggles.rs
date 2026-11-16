@@ -1,5 +1,6 @@
-//! Omarchy's own switches, read from its state files and changed only through its own
-//! commands, so the bar, menus and keybindings stay in step:
+//! The desktop's switches. On Omarchy they're Omarchy's own, read from its state files
+//! and changed only through its own commands, so the bar, menus and keybindings stay in
+//! step:
 //!
 //! - Do Not Disturb: `~/.local/state/omarchy/notifications/quiet.json` (`dnd`),
 //!   toggled with `omarchy-toggle-notification-silencing`.

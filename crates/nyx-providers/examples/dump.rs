@@ -11,7 +11,7 @@ fn main() {
         power::live().subscribe(|s| println!("power: {s:?}")),
         brightness::live().subscribe(|s| println!("brightness: {s:?}")),
         media::live().subscribe(|s| println!("media: {s:?}")),
-        omarchy::live().subscribe(|s| println!("omarchy: {s:?}")),
+        toggles::live().subscribe(|s| println!("toggles: {s:?}")),
     );
     let m = main.clone();
     glib::timeout_add_seconds_local_once(2, move || m.quit());

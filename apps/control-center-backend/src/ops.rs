@@ -4,7 +4,7 @@
 
 use crate::{App, launch, layout, plugins};
 use nyx_providers::{
-    audio, backup, bluetooth, brightness, devices, display, dns, home, media, network, omarchy, power, routes, tailscale, vpn,
+    audio, backup, bluetooth, brightness, devices, display, dns, home, media, network, power, routes, tailscale, toggles, vpn,
 };
 use nyx_ui_link::Request;
 use serde_json::{Value, json};
@@ -272,9 +272,10 @@ pub fn handle(app: &Rc<App>, req: Request) {
         "devices.start" => act(req, devices::start_flux()),
 
         // ---------- Toggles, power, media, home ----------
-        "omarchy.toggle_dnd" => act(req, omarchy::toggle_dnd()),
-        "omarchy.toggle_night_light" => act(req, omarchy::toggle_night_light()),
-        "omarchy.toggle_keep_awake" => act(req, omarchy::toggle_keep_awake()),
+        // The old omarchy.* names too, for a panel older than this backend.
+        "toggles.dnd" | "omarchy.toggle_dnd" => act(req, toggles::toggle_dnd()),
+        "toggles.night_light" | "omarchy.toggle_night_light" => act(req, toggles::toggle_night_light()),
+        "toggles.keep_awake" | "omarchy.toggle_keep_awake" => act(req, toggles::toggle_keep_awake()),
         "mode.cycle" => {
             glib::MainContext::default().spawn_local(async move {
                 let r = gio::spawn_blocking(|| nyx_desktop::omarchy::cycle(false).map_err(|e| e.to_string())).await;

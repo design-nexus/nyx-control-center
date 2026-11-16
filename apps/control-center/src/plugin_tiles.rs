@@ -330,7 +330,14 @@ fn widgets_for(h: &Host, plugin: &str, parts: &[String]) -> Vec<Widget> {
         }
         let size = kind(&t.widget).filter(|k| !k.sizes.contains(&t.size)).map(|k| k.sizes[0]).unwrap_or(t.size);
         let (width, height) = px(size);
-        out.push(Widget { item: part.to_string(), monitor: String::new(), size: size.to_string(), width, height, options: serde_json::Value::Null });
+        out.push(Widget {
+            item: part.to_string(),
+            monitor: String::new(),
+            size: size.to_string(),
+            width,
+            height,
+            options: serde_json::Value::Null,
+        });
     }
     out
 }
@@ -353,7 +360,11 @@ fn ensure_running(h: &Rc<Host>, id: &str) {
     let state = State::load();
     let parts = state.enabled_parts(&p.manifest, Kind::ControlCenter);
     let settings = settings_for(h, id, &p.manifest.settings);
-    let mut limits = Limits::resolve(p.trust.is_trusted(), &p.manifest.limits, h.settings.borrow().get(id).and_then(|t| t.get("limits")).and_then(|l| l.as_table()));
+    let mut limits = Limits::resolve(
+        p.trust.is_trusted(),
+        &p.manifest.limits,
+        h.settings.borrow().get(id).and_then(|t| t.get("limits")).and_then(|l| l.as_table()),
+    );
     // Tiles are small and the panel is a glance: 30 frames a second is plenty.
     limits.fps = limits.fps.min(30);
     let widgets = widgets_for(h, id, &parts);
@@ -548,7 +559,12 @@ fn on_message(h: &Rc<Host>, id: &str, msg: PluginMsg) {
         PluginMsg::Log { level, message } => eprintln!("[{id}] {level:?}: {message}"),
         PluginMsg::FrameReady { item, node, buffer } => {
             // Frames only while the panel shows them.
-            let Some(b) = h.plugins.borrow().get(id).filter(|r| r.visible).and_then(|r| r.frames.get(&(item.clone(), node.clone())).cloned())
+            let Some(b) = h
+                .plugins
+                .borrow()
+                .get(id)
+                .filter(|r| r.visible)
+                .and_then(|r| r.frames.get(&(item.clone(), node.clone())).cloned())
             else {
                 return;
             };
@@ -954,7 +970,11 @@ pub fn detail_view(n: u16, back: Rc<dyn Fn()>) -> gtk::Widget {
         .kinds
         .borrow()
         .iter()
-        .find(|k| k.plugin == plugin && discovery_manifest(&h, plugin).and_then(|m| m.part_of(Kind::ControlCenter, item)).as_deref() == Some(k.part.as_str()))
+        .find(|k| {
+            k.plugin == plugin
+                && discovery_manifest(&h, plugin).and_then(|m| m.part_of(Kind::ControlCenter, item)).as_deref()
+                    == Some(k.part.as_str())
+        })
         .map(|k| k.name.clone())
         .unwrap_or_else(|| missing_name(&tile_id(plugin, item)));
     let page = gtk::Box::new(gtk::Orientation::Vertical, 0);

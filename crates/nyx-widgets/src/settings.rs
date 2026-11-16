@@ -8,7 +8,8 @@ use serde::de::DeserializeOwned;
 
 /// Schema 1 is the first written by layer: a file from before held the whole layout, so
 /// what equals the built-in one is dropped and follows the defaults.
-pub const DOMAIN: nyx_config::Domain = nyx_config::Domain { name: "control-center", version: 1, migrations: &[nyx_config::drop_defaults] };
+pub const DOMAIN: nyx_config::Domain =
+    nyx_config::Domain { name: "control-center", version: 1, migrations: &[nyx_config::drop_defaults] };
 
 pub fn store<T: Serialize>(builtin: &T) -> nyx_config::Store {
     nyx_config::Store::new(DOMAIN, nyx_config::table_of(builtin))
@@ -63,7 +64,11 @@ mod tests {
         std::fs::create_dir_all(&layers.defaults).unwrap();
         let store = nyx_config::Store::with_layers(layers.clone(), DOMAIN, nyx_config::table_of(&builtin()));
         assert_eq!(load_from::<Config>(&store), builtin());
-        std::fs::write(layers.defaults.join("control-center.toml"), "[[pages]]\ntiles = [{ widget = \"dnd\", size = \"1x1\" }]\n").unwrap();
+        std::fs::write(
+            layers.defaults.join("control-center.toml"),
+            "[[pages]]\ntiles = [{ widget = \"dnd\", size = \"1x1\" }]\n",
+        )
+        .unwrap();
         let c: Config = load_from(&store);
         assert_eq!(c.pages[0].tiles[0].widget, "dnd");
         assert!(c.remember_page);
@@ -90,7 +95,11 @@ mod tests {
         let layers = nyx_config::Layers { defaults: d.path().join("d"), system: d.path().join("s"), user: d.path().join("u") };
         std::fs::create_dir_all(&layers.user).unwrap();
         std::fs::write(layers.user.join("control-center.toml"), KENS).unwrap();
-        let builtin = Full { pages: vec![Page { tiles: vec![Tile::new("wifi", Size::S2X1)] }, Page::default()], remember_page: true, version: 3 };
+        let builtin = Full {
+            pages: vec![Page { tiles: vec![Tile::new("wifi", Size::S2X1)] }, Page::default()],
+            remember_page: true,
+            version: 3,
+        };
         let store = nyx_config::Store::with_layers(layers.clone(), DOMAIN, nyx_config::table_of(&builtin));
         let c: Full = load_from(&store);
         assert_eq!(c.pages.len(), 1);

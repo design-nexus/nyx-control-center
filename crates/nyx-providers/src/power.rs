@@ -327,7 +327,8 @@ fn read_points(bus: &gio::DBusConnection) -> Vec<Point> {
         return vec![];
     };
     let list = reply.child_value(0);
-    let records: Vec<(u32, f64, u32)> = (0..list.n_children()).filter_map(|i| list.child_value(i).get::<(u32, f64, u32)>()).collect();
+    let records: Vec<(u32, f64, u32)> =
+        (0..list.n_children()).filter_map(|i| list.child_value(i).get::<(u32, f64, u32)>()).collect();
     let now = glib::real_time() / 1_000_000;
     points_of(&records, now - DAY as i64)
 }
@@ -376,7 +377,11 @@ pub fn hogs(
         *a = *a * 0.6 + used * 0.4;
     }
     avg.retain(|app, a| after.contains_key(app) && *a >= 0.5);
-    let mut list: Vec<Hog> = avg.iter().filter(|(_, a)| **a >= 5.0).map(|(app, a)| Hog { app: pretty(app), cpu: (*a * 10.0).round() / 10.0 }).collect();
+    let mut list: Vec<Hog> = avg
+        .iter()
+        .filter(|(_, a)| **a >= 5.0)
+        .map(|(app, a)| Hog { app: pretty(app), cpu: (*a * 10.0).round() / 10.0 })
+        .collect();
     list.sort_by(|a, b| b.cpu.total_cmp(&a.cpu));
     list.truncate(4);
     list

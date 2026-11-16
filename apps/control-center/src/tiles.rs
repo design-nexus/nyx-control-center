@@ -4,7 +4,7 @@
 use crate::ui::{self, act, bind, chip, icon, icon_button, label, set_class};
 use gtk::prelude::*;
 use gtk::{gio, glib};
-use nyx_providers::{audio, bluetooth, brightness, devices, media, network, omarchy, power};
+use nyx_providers::{audio, bluetooth, brightness, devices, media, network, power, toggles};
 use nyx_widgets::layout::{Page, Size, Tile};
 use nyx_widgets::live::Live;
 use std::rc::Rc;
@@ -469,10 +469,10 @@ fn devices_tile(ctx: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
 
 fn dnd(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     let (tile, chip_box, _, status) =
-        toggle(size, "notifications-disabled-symbolic", "Do not disturb", || act(omarchy::toggle_dnd()));
+        toggle(size, "notifications-disabled-symbolic", "Do not disturb", || act(toggles::toggle_dnd()));
     tint(&tile, "violet");
     let t = tile.clone();
-    bind(&tile, omarchy::live(), move |st| {
+    bind(&tile, toggles::live(), move |st| {
         t.set_tooltip_text(Some(if st.dnd {
             "Do not disturb is on: pop-ups stay quiet. Click to allow them"
         } else {
@@ -515,10 +515,10 @@ fn microphone(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
 }
 
 fn night_light(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
-    let (tile, chip_box, _, status) = toggle(size, "night-light-symbolic", "Night light", || act(omarchy::toggle_night_light()));
+    let (tile, chip_box, _, status) = toggle(size, "night-light-symbolic", "Night light", || act(toggles::toggle_night_light()));
     tint(&tile, "coral");
     let t = tile.clone();
-    bind(&tile, omarchy::live(), move |st| {
+    bind(&tile, toggles::live(), move |st| {
         t.set_tooltip_text(Some(if st.night_light {
             "Night light is on: warmer screen colours. Click to turn it off"
         } else {
@@ -533,10 +533,10 @@ fn night_light(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
 
 fn keep_awake(_: &Ctx, size: Size, _: &Tile) -> gtk::Widget {
     let (tile, chip_box, _, status) =
-        toggle(size, "preferences-desktop-screensaver-symbolic", "Keep awake", || act(omarchy::toggle_keep_awake()));
+        toggle(size, "preferences-desktop-screensaver-symbolic", "Keep awake", || act(toggles::toggle_keep_awake()));
     tint(&tile, "amber");
     let t = tile.clone();
-    bind(&tile, omarchy::live(), move |st| {
+    bind(&tile, toggles::live(), move |st| {
         t.set_tooltip_text(Some(if st.keep_awake {
             "Keep awake is on: the screen won't dim, lock or sleep. Click to turn it off"
         } else {
