@@ -11,15 +11,15 @@ repository.workspace = true
 async-channel = "2"
 gtk = { version = "0.11", package = "gtk4", features = ["v4_18"] }
 gtk4-layer-shell = "0.8"
-nyx-desktop = { git = "https://github.com/design-nexus/nyx-core.git", rev = "94e0c8aa133074c74adb31365e51f56168114f68" }
+nyx-desktop = { git = "https://github.com/design-nexus/nyx-core.git", rev = "a258c315f056ac649586fdb55e98613056221411" }
 # The plugin system: nyx-core, and its GTK drawing in nyx-design.
-nyx-plugin = { git = "https://github.com/design-nexus/nyx-core.git", rev = "94e0c8aa133074c74adb31365e51f56168114f68" }
-nyx-plugin-host = { git = "https://github.com/design-nexus/nyx-core.git", rev = "94e0c8aa133074c74adb31365e51f56168114f68" }
-nyx-plugin-protocol = { git = "https://github.com/design-nexus/nyx-core.git", rev = "94e0c8aa133074c74adb31365e51f56168114f68" }
-nyx-plugin-view = { git = "https://github.com/design-nexus/nyx-design.git", rev = "ea8839d237a23ec83887429475f0780c06a36826" }
+nyx-plugin = { git = "https://github.com/design-nexus/nyx-core.git", rev = "a258c315f056ac649586fdb55e98613056221411" }
+nyx-plugin-host = { git = "https://github.com/design-nexus/nyx-core.git", rev = "a258c315f056ac649586fdb55e98613056221411" }
+nyx-plugin-protocol = { git = "https://github.com/design-nexus/nyx-core.git", rev = "a258c315f056ac649586fdb55e98613056221411" }
+nyx-plugin-view = { git = "https://github.com/design-nexus/nyx-design.git", rev = "914b14ec5574ca04cbb985b571cfbfb0a42aae15" }
 nyx-providers = { path = "../../crates/nyx-providers" }
-nyx-ui-link = { git = "https://github.com/design-nexus/nyx-core.git", rev = "94e0c8aa133074c74adb31365e51f56168114f68" }
-nyx-theme = { git = "https://github.com/design-nexus/nyx-design.git", rev = "ea8839d237a23ec83887429475f0780c06a36826" }
+nyx-ui-link = { git = "https://github.com/design-nexus/nyx-core.git", rev = "a258c315f056ac649586fdb55e98613056221411" }
+nyx-theme = { git = "https://github.com/design-nexus/nyx-design.git", rev = "914b14ec5574ca04cbb985b571cfbfb0a42aae15" }
 nyx-widgets = { path = "../../crates/nyx-widgets" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
