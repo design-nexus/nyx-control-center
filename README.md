@@ -1,10 +1,12 @@
 # Control Center
 
-Quick settings for [Omarchy](https://omarchy.org) and Hyprland: a panel on the right
+Quick settings for NyxOS and [Omarchy](https://omarchy.org): a panel on the right
 edge of the screen with your connections, sound, brightness, power mode, what's playing
-and Omarchy's own switches. It takes its colors from your Omarchy theme.
+and Omarchy's own switches. It takes its colors from the desktop theme.
 
 ## Install
+
+On NyxOS, the Control Center comes with the system. On Omarchy:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/design-nexus/nyx-control-center/main/install.sh | bash
