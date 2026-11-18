@@ -170,7 +170,7 @@ Column {
                         onClicked: v.ctx.call("copy", { text: m.modelData.dns || m.modelData.name })
                     }
                     IconButton {
-                        visible: v.ctx.env.omarchy && m.modelData.online && v.ctx.have("omarchy-tailscale-send")
+                        visible: m.modelData.online && v.ctx.have("omarchy-tailscale-send")
                         icon: "document-send-symbolic"
                         tooltip: "Send files"
                         onClicked: v.ctx.call("tailscale.send", { dns: m.modelData.dns })

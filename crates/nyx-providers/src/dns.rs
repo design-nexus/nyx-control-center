@@ -74,7 +74,12 @@ pub fn refresh(set: Setter<State>) {
 /// `Custom` opens a terminal to type the servers in.
 pub async fn set_dns(provider: &str) -> Result<(), String> {
     let r = if provider == "Custom" {
-        crate::spawn(&["omarchy-launch-floating-terminal-with-presentation", "omarchy-dns Custom"]);
+        if crate::omarchy::here() {
+            crate::spawn(&["omarchy-launch-floating-terminal-with-presentation", "omarchy-dns Custom"]);
+        } else {
+            // Settings › Network asks for the servers.
+            crate::spawn(&["nyx-settings", "--section", "network"]);
+        }
         Ok(())
     } else {
         run(&["omarchy-dns", provider], None).await
@@ -101,12 +106,22 @@ pub fn sign_in() {
 }
 
 /// Omarchy's speed test and share-by-QR panels.
+/// Omarchy's speed test window, or (NyxOS) Settings › Network, whose test runs nyx-platform's.
 pub fn speed_test() {
-    crate::spawn(&["omarchy-shell", "shell", "summon", "omarchy.speedtest", "{}"]);
+    if crate::omarchy::here() {
+        crate::spawn(&["omarchy-shell", "shell", "summon", "omarchy.speedtest", "{}"]);
+    } else {
+        crate::spawn(&["nyx-settings", "--section", "network"]);
+    }
 }
 
+/// Omarchy's QR window, or (NyxOS) Settings › Wi-Fi, which shows the network's code.
 pub fn share_qr() {
-    crate::spawn(&["omarchy-shell", "shell", "summon", "omarchy.wifiqr", "{}"]);
+    if crate::omarchy::here() {
+        crate::spawn(&["omarchy-shell", "shell", "summon", "omarchy.wifiqr", "{}"]);
+    } else {
+        crate::spawn(&["nyx-settings", "--section", "wifi"]);
+    }
 }
 
 #[cfg(test)]

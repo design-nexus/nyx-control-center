@@ -104,7 +104,10 @@ pub fn launch(args: &[&str]) {
     if uwsm {
         cmd.args(["uwsm-app", "--"]);
     }
-    cmd.args(args).stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null());
+    cmd.args(nyx_providers::resolve(args))
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
     match cmd.spawn() {
         Ok(mut c) => {
             std::thread::spawn(move || c.wait());

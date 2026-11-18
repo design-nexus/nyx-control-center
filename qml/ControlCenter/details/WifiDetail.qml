@@ -253,13 +253,11 @@ Column {
             }
         }
         IconButton {
-            visible: v.ctx.env.omarchy
             icon: "view-grid-symbolic"
             tooltip: "Share this network: a QR code a phone can scan to join"
             onClicked: v.ctx.call("dns.share_qr", {})
         }
         IconButton {
-            visible: v.ctx.env.omarchy
             icon: "network-transmit-receive-symbolic"
             tooltip: "Speed test: measure download and upload"
             onClicked: v.ctx.call("dns.speed_test", {})

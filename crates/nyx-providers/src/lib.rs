@@ -44,8 +44,15 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
+/// `args` to run here: an Omarchy script this computer lacks (NyxOS) becomes
+/// `nyx-platform JOB …`, which takes the same arguments and prints the same.
+pub fn resolve(args: &[&str]) -> Vec<String> {
+    nyx_platform::resolve(args)
+}
+
 /// Run a command and return what it printed, or `None` if it failed.
 pub async fn output(args: &[&str]) -> Option<String> {
+    let args = resolve(args);
     let argv: Vec<&std::ffi::OsStr> = args.iter().map(std::ffi::OsStr::new).collect();
     let p = gio::Subprocess::newv(&argv, gio::SubprocessFlags::STDOUT_PIPE | gio::SubprocessFlags::STDERR_SILENCE).ok()?;
     let (out, _) = p.communicate_utf8_future(None).await.ok()?;
@@ -55,6 +62,7 @@ pub async fn output(args: &[&str]) -> Option<String> {
 /// Run a command for its effect; `true` if it succeeded. `stdin` is written to it
 /// (a password for `nmcli --ask`, say) so it never shows in a process list.
 pub async fn run(args: &[&str], stdin: Option<&str>) -> Result<(), String> {
+    let args = resolve(args);
     let argv: Vec<&std::ffi::OsStr> = args.iter().map(std::ffi::OsStr::new).collect();
     let mut flags = gio::SubprocessFlags::STDOUT_SILENCE | gio::SubprocessFlags::STDERR_PIPE;
     if stdin.is_some() {
@@ -69,9 +77,9 @@ pub async fn run(args: &[&str], stdin: Option<&str>) -> Result<(), String> {
     }
 }
 
-/// A program is on PATH.
+/// A program is on PATH (or is an Omarchy script `nyx-platform` stands in for).
 pub fn present(program: &str) -> bool {
-    std::env::var_os("PATH").is_some_and(|p| std::env::split_paths(&p).any(|d| d.join(program).is_file()))
+    nyx_platform::present(program)
 }
 
 /// Fire and forget.
