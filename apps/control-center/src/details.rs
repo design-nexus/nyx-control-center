@@ -151,12 +151,8 @@ fn wifi(back: Rc<dyn Fn()>) -> gtk::Widget {
     qr.connect_clicked(|_| nyx_providers::dns::share_qr());
     let settings = icon_button("emblem-system-symbolic", "Wi-Fi settings");
     settings.connect_clicked(|_| ui::open_settings("wifi"));
-    // The speed test and the QR code are Omarchy's.
-    let mut buttons = vec![rescan];
-    if nyx_providers::omarchy::here() {
-        buttons.extend([speed, qr]);
-    }
-    buttons.push(settings);
+    // The speed test and the QR code: Omarchy's windows, or Settings' pages for them (NyxOS).
+    let buttons = vec![rescan, speed, qr, settings];
     root.append(&foot(&buttons));
     let e = extras.clone();
     bind(&root, nyx_providers::dns::live(), move |st| wifi_extras(&e, st));
