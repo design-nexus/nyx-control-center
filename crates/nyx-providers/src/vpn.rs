@@ -146,6 +146,17 @@ async fn read_state() -> State {
             location: region.lines().next().unwrap_or("").trim().to_string(),
         });
     }
+    // ExpressVPN 3 (as nixpkgs has it): one `expressvpn` command.
+    else if present("expressvpn") {
+        let text = output(&["expressvpn", "status"]).await.unwrap_or_default();
+        services.push(Service {
+            id: "express".into(),
+            name: "ExpressVPN".into(),
+            kind: Kind::Express,
+            connected: says_connected(&text),
+            location: express3_location(&text),
+        });
+    }
     if present("piactl") {
         let state = output(&["piactl", "get", "connectionstate"]).await.unwrap_or_default();
         let region = output(&["piactl", "get", "region"]).await.unwrap_or_default();
@@ -303,7 +314,7 @@ async fn done(r: Result<(), String>) -> Result<(), String> {
 pub async fn disconnect(s: &Service) -> Result<(), String> {
     let r = match &s.kind {
         Kind::Nord => run(&["nordvpn", "disconnect"], None).await,
-        Kind::Express => run(&["expressvpnctl", "disconnect"], None).await,
+        Kind::Express => run(&[express(), "disconnect"], None).await,
         Kind::Pia => run(&["piactl", "disconnect"], None).await,
         Kind::Mullvad => run(&["mullvad", "disconnect"], None).await,
         Kind::Proton => run(&["protonvpn", "disconnect"], None).await,
@@ -333,8 +344,8 @@ pub async fn connect(s: &Service, place: Option<&str>) -> Result<(), String> {
     let r = match (&s.kind, place) {
         (Kind::Nord, Some(p)) => run(&["nordvpn", "connect", p], None).await,
         (Kind::Nord, None) => run(&["nordvpn", "connect"], None).await,
-        (Kind::Express, Some(p)) => run(&["expressvpnctl", "connect", p], None).await,
-        (Kind::Express, None) => run(&["expressvpnctl", "connect"], None).await,
+        (Kind::Express, Some(p)) => run(&[express(), "connect", p], None).await,
+        (Kind::Express, None) => run(&[express(), "connect"], None).await,
         (Kind::Pia, p) => {
             run(&["piactl", "set", "region", p.unwrap_or("auto")], None).await?;
             run(&["piactl", "connect"], None).await
@@ -354,12 +365,40 @@ pub async fn connect(s: &Service, place: Option<&str>) -> Result<(), String> {
     done(r).await
 }
 
+/// ExpressVPN's command: `expressvpnctl` (4) or `expressvpn` (3).
+fn express() -> &'static str {
+    if present("expressvpnctl") { "expressvpnctl" } else { "expressvpn" }
+}
+
+/// ExpressVPN 3's status: "Connected to Germany - Frankfurt".
+fn express3_location(status: &str) -> String {
+    status.lines().find_map(|l| l.trim().strip_prefix("Connected to ")).unwrap_or("").trim().to_string()
+}
+
+/// ExpressVPN 3's `list all`: an ALIAS, COUNTRY, LOCATION table under a header and a
+/// dashed rule; columns are separated by tabs or runs of spaces.
+fn express3_places(text: &str) -> Vec<Place> {
+    text.lines()
+        .skip_while(|l| !l.starts_with("---"))
+        .skip(1)
+        .filter_map(|l| {
+            let cols: Vec<&str> = l.split('\t').flat_map(|c| c.split("  ")).map(str::trim).filter(|c| !c.is_empty()).collect();
+            let alias = cols.first()?;
+            let name = cols.get(2).or(cols.get(1)).unwrap_or(alias);
+            Some(Place { arg: alias.to_string(), name: name.to_string(), city: false })
+        })
+        .collect()
+}
+
 /// Where a service can connect to. Slow for some tools: ask when needed, once.
 pub async fn places(kind: &Kind) -> Vec<Place> {
     match kind {
         Kind::Nord => {
             let Some(t) = output(&["nordvpn", "countries"]).await else { return Vec::new() };
             words(&t).into_iter().map(|c| Place { name: c.replace('_', " "), arg: c, city: false }).collect()
+        }
+        Kind::Express if !present("expressvpnctl") => {
+            output(&["expressvpn", "list", "all"]).await.map(|t| express3_places(&t)).unwrap_or_default()
         }
         Kind::Express => output(&["expressvpnctl", "get", "regions"])
             .await
@@ -551,6 +590,16 @@ const PROTON_COUNTRIES: &[&str] = &[
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reads_expressvpn_3() {
+        assert_eq!(express3_location("Connected to Germany - Frankfurt\n"), "Germany - Frankfurt");
+        assert_eq!(express3_location("Not connected."), "");
+        let list = "ALIAS\tCOUNTRY\t\t\t\tLOCATION\t\t\tRECOMMENDED\n-----\t---------------\t\t--------\t\t---\nsmart\tSmart Location\t\t\tUSA - New York\t\tY\ndefr1\tGermany (DE)\t\t\tGermany - Frankfurt - 1\tY\n";
+        let places = express3_places(list);
+        assert_eq!(places.len(), 2);
+        assert_eq!((places[1].arg.as_str(), places[1].name.as_str()), ("defr1", "Germany - Frankfurt - 1"));
+    }
 
     #[test]
     fn reads_tools() {
