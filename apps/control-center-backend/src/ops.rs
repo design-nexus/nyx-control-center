@@ -239,6 +239,9 @@ pub fn handle(app: &Rc<App>, req: Request) {
         "network.disconnect" => act(req, async move { network::disconnect(&s(&b, "uuid")).await }),
         "network.set_metered" => act(req, async move { network::set_metered(&s(&b, "uuid"), on(&b)).await }),
         "network.rescan" => act(req, network::rescan()),
+        "network.connect_hidden" => act(req, async move { network::connect_hidden(&s(&b, "ssid"), &s(&b, "password")).await }),
+        "network.forget" => act(req, async move { network::forget(&s(&b, "ssid")).await }),
+        "network.restart_wifi" => act(req, network::restart_wifi()),
         "network.set_vpn" => {
             let id = s(&b, "id");
             let Some(v) = network::live().get().vpns.into_iter().find(|v| v.id == id) else {

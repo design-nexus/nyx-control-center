@@ -12,6 +12,13 @@ Column {
     readonly property var dnsState: dns.value || ({})
     readonly property var cur: (st.networks || []).find(n => n.active) || null
     property string asking: ""
+    // The network being joined, and why the last join failed (shown under its row).
+    property string joining: ""
+    property string failedSsid: ""
+    property string failedWhy: ""
+    property bool askingHidden: false
+    // Pinned to one band, rather than letting Wi-Fi choose ("auto", or nothing).
+    readonly property bool bandPinned: !!v.dnsState.band && !!v.dnsState.band.selected && v.dnsState.band.selected !== "auto"
     BackendTopic { id: net; client: v.ctx.client; name: "network"; active: !!(v.ctx && v.ctx.open) }
     BackendTopic { id: details; client: v.ctx.client; name: "dns-details"; active: !!(v.ctx && v.ctx.open && v.st.wifi_on === true) }
     BackendTopic { id: dns; client: v.ctx.client; name: "dns"; active: !!(v.ctx && v.ctx.open) }
@@ -22,6 +29,21 @@ Column {
     }
     function ms(v) {
         return v === null || v === undefined ? "—" : Math.round(v) + " ms";
+    }
+    function ghz(mhz) {
+        return mhz ? (mhz / 1000).toFixed(mhz % 1000 === 0 ? 0 : 1) + " GHz" : "—";
+    }
+    // Join, showing "Joining…" on the row until it answers, and why if it fails.
+    function join(op, body) {
+        v.joining = body.ssid;
+        v.failedSsid = "";
+        v.ctx.call(op, body, (ok, err) => {
+            v.joining = "";
+            if (err) {
+                v.failedSsid = body.ssid;
+                v.failedWhy = err.msg || "Couldn't join";
+            }
+        });
     }
 
     spacing: 0
@@ -53,6 +75,11 @@ Column {
                 icon: "network-offline-symbolic"
                 tooltip: "Disconnect"
                 onClicked: v.ctx.call("network.disconnect", { uuid: v.st.wifi_uuid })
+            }
+            IconButton {
+                icon: "user-trash-symbolic"
+                tooltip: "Forget this network: its password and settings"
+                onClicked: v.ctx.call("network.forget", { ssid: v.cur.ssid })
             }
         }
         CcRow {
@@ -86,9 +113,10 @@ Column {
                         CcRow {
                             icon: v.bars(netRow.modelData.signal)
                             title: netRow.modelData.ssid.trim()
+                            sub: v.joining === netRow.modelData.ssid ? "Joining…" : v.failedSsid === netRow.modelData.ssid ? v.failedWhy : ""
                             onClicked: {
                                 if (netRow.modelData.known || !netRow.modelData.secure)
-                                    v.ctx.call("network.connect", { ssid: netRow.modelData.ssid });
+                                    v.join("network.connect", { ssid: netRow.modelData.ssid });
                                 else
                                     v.asking = netRow.modelData.ssid;
                             }
@@ -99,6 +127,12 @@ Column {
                                 size: 14
                                 recolor: true
                                 color: Style.tertiary
+                            }
+                            IconButton {
+                                visible: netRow.modelData.known
+                                icon: "user-trash-symbolic"
+                                tooltip: "Forget this network"
+                                onClicked: v.ctx.call("network.forget", { ssid: netRow.modelData.ssid })
                             }
                         }
                         Row {
@@ -114,7 +148,7 @@ Column {
                                 placeholder: "Password"
                                 onVisibleChanged: if (visible) focusInput()
                                 onAccepted: {
-                                    v.ctx.call("network.connect", { ssid: netRow.modelData.ssid, password: pw.text });
+                                    v.join("network.connect", { ssid: netRow.modelData.ssid, password: pw.text });
                                     v.asking = "";
                                 }
                                 onEscaped: v.asking = ""
@@ -125,6 +159,57 @@ Column {
                                 onClicked: pw.accepted()
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+    // A network that doesn't broadcast its name.
+    Column {
+        width: parent.width
+        visible: !!v.st.wifi_on
+        topPadding: 8
+        CardBox {
+            CcRow {
+                icon: "list-add-symbolic"
+                title: "Join a hidden network"
+                sub: v.joining !== "" && v.joining === hiddenSsid.text ? "Joining…" : v.failedSsid !== "" && v.failedSsid === hiddenSsid.text ? v.failedWhy : ""
+                onClicked: v.askingHidden = !v.askingHidden
+            }
+            Column {
+                visible: v.askingHidden
+                leftPadding: 34
+                bottomPadding: 8
+                spacing: 6
+                SearchField {
+                    id: hiddenSsid
+                    width: v.width - 34 - 24
+                    icon: ""
+                    placeholder: "Network name"
+                    onVisibleChanged: if (visible) focusInput()
+                    onAccepted: hiddenPw.focusInput()
+                    onEscaped: v.askingHidden = false
+                }
+                Row {
+                    spacing: 6
+                    SearchField {
+                        id: hiddenPw
+                        width: v.width - 34 - 24 - 48
+                        icon: ""
+                        password: true
+                        placeholder: "Password (empty if open)"
+                        onAccepted: {
+                            if (hiddenSsid.text === "")
+                                return;
+                            v.join("network.connect_hidden", { ssid: hiddenSsid.text, password: hiddenPw.text });
+                            v.askingHidden = false;
+                        }
+                        onEscaped: v.askingHidden = false
+                    }
+                    IconButton {
+                        icon: "go-next-symbolic"
+                        tooltip: "Join (Enter)"
+                        onClicked: hiddenPw.accepted()
                     }
                 }
             }
@@ -144,6 +229,8 @@ Column {
             Fact { name: "Down"; value: v.d && v.d.down_text ? v.d.down_text : "…" }
             Fact { name: "Up"; value: v.d && v.d.up_text ? v.d.up_text : "…" }
             Fact { visible: !!(v.d && v.d.ssid); name: "Signal"; value: v.d && v.d.signal_dbm !== null && v.d.signal_dbm !== undefined ? v.d.signal_dbm + " dBm" : "—" }
+            Fact { visible: !!(v.d && v.d.ssid); name: "Link speed"; value: v.d && v.d.bitrate ? v.d.bitrate : "—" }
+            Fact { visible: !!(v.d && v.d.ssid); name: "Frequency"; value: v.d ? v.ghz(v.d.freq) : "—" }
         }
     }
     Column {
@@ -222,14 +309,15 @@ Column {
     }
     Column {
         width: parent.width
-        visible: !!v.st.wifi_on && !!v.dnsState.band && ((v.dnsState.band.available || []).length > 1 || !!v.dnsState.band.selected)
+        // Only when there's a choice, or a pin to undo.
+        visible: !!v.st.wifi_on && !!v.dnsState.band && ((v.dnsState.band.available || []).length > 1 || v.bandPinned)
         Group {
             text: "Band"
         }
         CardBox {
             CcRow {
-                title: "Automatic" + (v.dnsState.band ? " (now " + v.dnsState.band.current + " GHz)" : "")
-                selected: !!v.dnsState.band && !v.dnsState.band.selected
+                title: "Automatic" + (v.dnsState.band && v.dnsState.band.current ? " (now " + v.dnsState.band.current + " GHz)" : "")
+                selected: !!v.dnsState.band && !v.bandPinned
                 onClicked: v.ctx.call("dns.set_band", { band: "auto" })
             }
             Repeater {
@@ -266,6 +354,11 @@ Column {
             icon: "view-refresh-symbolic"
             tooltip: "Look for networks again"
             onClicked: v.ctx.call("network.rescan", {})
+        }
+        IconButton {
+            icon: "system-reboot-symbolic"
+            tooltip: "Restart Wi-Fi: turn the radio off and on"
+            onClicked: v.ctx.call("network.restart_wifi", {})
         }
     }
 }

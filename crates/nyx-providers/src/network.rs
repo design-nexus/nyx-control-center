@@ -202,7 +202,41 @@ pub async fn connect(n: &Network, password: Option<&str>) -> Result<(), String> 
     } else {
         run(&["nmcli", "device", "wifi", "connect", &n.ssid], None).await
     };
-    after(r).await
+    after(r.map_err(|e| explain(&e))).await
+}
+
+/// Join a network that doesn't broadcast its name. An empty `password` means open.
+pub async fn connect_hidden(ssid: &str, password: &str) -> Result<(), String> {
+    let r = if password.is_empty() {
+        run(&["nmcli", "device", "wifi", "connect", ssid, "hidden", "yes"], None).await
+    } else {
+        run(&["nmcli", "--ask", "device", "wifi", "connect", ssid, "hidden", "yes"], Some(&format!("{password}\n"))).await
+    };
+    after(r.map_err(|e| explain(&e))).await
+}
+
+/// Forget a saved network: its password and settings go.
+pub async fn forget(ssid: &str) -> Result<(), String> {
+    after(run(&["nmcli", "connection", "delete", "id", ssid], None).await).await
+}
+
+/// Turn the Wi-Fi radio off and on again.
+pub async fn restart_wifi() -> Result<(), String> {
+    after(run(&["nyx-platform", "restart-wifi"], None).await).await
+}
+
+/// Why joining failed, in words, from what nmcli said.
+pub fn explain(nmcli: &str) -> String {
+    let e = nmcli.to_lowercase();
+    if e.contains("secrets were required") || e.contains("802-1x supplicant") || e.contains("wrong password") {
+        "Wrong password".into()
+    } else if e.contains("no network with ssid") {
+        "Network not found".into()
+    } else if e.contains("timeout") || e.contains("timed out") {
+        "Timed out".into()
+    } else {
+        nmcli.trim_start_matches("Error: ").to_string()
+    }
 }
 
 pub async fn disconnect(uuid: &str) -> Result<(), String> {
@@ -230,6 +264,15 @@ pub async fn set_vpn(vpn: &Vpn, on: bool) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn explains_failures() {
+        let wrong = "Error: Connection activation failed: Secrets were required, but not provided.";
+        assert_eq!(explain(wrong), "Wrong password");
+        assert_eq!(explain("Error: No network with SSID 'Cafe' found."), "Network not found");
+        assert_eq!(explain("Error: Timeout expired (90 seconds)"), "Timed out");
+        assert_eq!(explain("Error: something else"), "something else");
+    }
 
     #[test]
     fn network_list() {
